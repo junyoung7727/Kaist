@@ -1,0 +1,113 @@
+{
+  "experiment_info": {
+    "total_circuits": 837,
+    "timestamp": "2025-05-29T10:17:55.347029",
+    "experiment_type": "800만 샷 2큐빗 게이트 비율 테스트"
+  },
+  "circuit_statistics": {
+    "qubit_range": {
+      "min": 5,
+      "max": 127
+    },
+    "depth_range": {
+      "min": 1,
+      "max": 4
+    },
+    "two_qubit_ratio_range": {
+      "min": 0.1,
+      "max": 0.5
+    },
+    "unique_configurations": 84
+  },
+  "performance_statistics": {
+    "fidelity": {
+      "mean": 0.2597426586178708,
+      "std": 0.22229544051621083,
+      "min": 0.0,
+      "max": 0.6570723684210527,
+      "median": 0.26973684210526316
+    },
+    "robust_fidelity": {
+      "mean": 0.6663728934792177,
+      "std": 0.3133486888395145,
+      "min": 0.0,
+      "max": 1.0,
+      "median": 0.7944078947368421
+    },
+    "total_error_rate": {
+      "mean": 0.7402573413821292,
+      "std": 0.22229544051621083,
+      "min": 0.34292763157894735,
+      "max": 1.0,
+      "median": 0.7302631578947368
+    },
+    "expressibility": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "median": 0.0
+    }
+  },
+  "two_qubit_ratio_analysis": {
+    "10.0%": {
+      "count": 280,
+      "fidelity_mean": 0.2838962640977444,
+      "robust_fidelity_mean": 0.7878142622180451,
+      "error_rate_mean": 0.7161037359022556,
+      "fidelity_std": 0.2193960742523547,
+      "robust_fidelity_std": 0.2069187513699609,
+      "error_rate_std": 0.2193960742523547,
+      "expressibility_mean": 0.0,
+      "expressibility_std": 0.0
+    },
+    "30.0%": {
+      "count": 280,
+      "fidelity_mean": 0.2531896146616541,
+      "robust_fidelity_mean": 0.6372562265037593,
+      "error_rate_mean": 0.7468103853383458,
+      "fidelity_std": 0.22141122368139743,
+      "robust_fidelity_std": 0.3156809623600507,
+      "error_rate_std": 0.2214112236813974,
+      "expressibility_mean": 0.0,
+      "expressibility_std": 0.0
+    },
+    "50.0%": {
+      "count": 277,
+      "fidelity_mean": 0.24195147729431882,
+      "robust_fidelity_mean": 0.573048285198556,
+      "error_rate_mean": 0.7580485227056812,
+      "fidelity_std": 0.22395689608775854,
+      "robust_fidelity_std": 0.35805306128881825,
+      "error_rate_std": 0.22395689608775854,
+      "expressibility_mean": 0.0,
+      "expressibility_std": 0.0
+    }
+  },
+  "error_analysis": {
+    "high_error_circuits_count": 837,
+    "high_error_circuits_percentage": 100.0,
+    "low_fidelity_circuits_count": 680,
+    "low_fidelity_circuits_percentage": 81.24253285543608
+  },
+  "recommendations": {
+    "best_ratio_for_fidelity": "10.0%",
+    "best_ratio_for_robust_fidelity": "10.0%",
+    "best_ratio_for_low_error": "10.0%",
+    "overall_recommendation": "10.0%",
+    "recommendation_reason": "Robust 피델리티가 노이즈 환경에서 더 신뢰할 수 있는 지표입니다."
+  },
+  "execution_info": {
+    "target_total_shots": 8000000,
+    "actual_total_shots": 1017792,
+    "shots_efficiency": 0.127224,
+    "data_integrity": "완전 보장 (Config 기반 적정 샷 수)",
+    "batch_count": 1,
+    "config_based_shots": true,
+    "shots_adequacy": {
+      "fidelity_adequate": false,
+      "expressibility_adequate": true,
+      "statistical_adequate": true
+    }
+  }
+}

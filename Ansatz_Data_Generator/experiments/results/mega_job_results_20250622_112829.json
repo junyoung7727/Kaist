@@ -1,0 +1,128 @@
+{
+  "experiment_type": "mega_job",
+  "timestamp": "20250622_112829",
+  "circuit_count": 320,
+  "results": [
+    {
+      "gates": [
+        "RY",
+        "Y",
+        "S",
+        "T",
+        "Z",
+        "S",
+        "T"
+      ],
+      "wires_list": [
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          0
+        ],
+        [
+          4
+        ],
+        [
+          0
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ]
+      ],
+      "params": [
+        4.988903950469744
+      ],
+      "params_idx": [
+        0
+      ],
+      "n_qubits": 5,
+      "depth": 5,
+      "coupling_map": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "strategy": "hardware_efficient",
+      "seed": 0,
+      "two_qubit_ratio": 0.1,
+      "circuit_stats": {
+        "total_gates": 7,
+        "single_qubit_gates": 7,
+        "two_qubit_gates": 0,
+        "parametric_gates": 1,
+        "gate_distribution": {
+          "RY": 1,
+          "Y": 1,
+          "S": 2,
+          "T": 2,
+          "Z": 1
+        },
+        "qubit_usage": {
+          "2": 2,
+          "3": 1,
+          "0": 2,
+          "4": 2
+        }
+      },
+      "circuit_id": 0,
+      "config_group": "q5_d5_r10",
+      "two_qubit_ratio_target": 0.1,
+      "circuit_properties": {
+        "n_qubits": 5,
+        "depth": 5,
+        "total_gates": 7,
+        "gate_counts": {
+          "RY": 1,
+          "Y": 1,
+          "S": 2,
+          "T": 2,
+          "Z": 1
+        },
+        "two_qubit_count": 0,
+        "two_qubit_ratio": 0.0,
+        "param_gate_count": 1,
+        "param_gate_ratio": 0.14285714285714285,
+        "connectivity_density": 0.0,
+        "qubit_gate_stats": {
+          "min": 0,
+          "max": 2,
+          "mean": 1.4,
+          "std": 0.8
+        },
+        "transpiled_depth": 1,
+        "transpiled_size": 5,
+        "transpiled_gate_counts": {
+          "measure": 5,
+          "barrier": 1
+        },
+        "estimated_time_us": 10
+      },
+      "qiskit_circuit": 
