@@ -1,0 +1,41 @@
+{
+  "os": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python": "CPython 3.10.16",
+  "startedAt": "2025-06-06T04:21:19.151727Z",
+  "program": "/mnt/c/Users/jungh/Documents/GitHub/Quantum_Stock_Prediction/train_predictor.py",
+  "codePath": "train_predictor.py",
+  "git": {
+    "remote": "https://github.com/junyoung7727/Quantum_Circuit_Dit.git",
+    "commit": "735d4d608184ed85e907af1724ff528eeb0645e4"
+  },
+  "email": "junghae2017@gmail.com",
+  "root": "/mnt/c/Users/jungh/Documents/GitHub/Quantum_Stock_Prediction",
+  "host": "love",
+  "executable": "/home/junyoung/miniconda3/envs/quantum_new/bin/python",
+  "codePathLocal": "train_predictor.py",
+  "cpu_count": 4,
+  "cpu_count_logical": 8,
+  "gpu": "NVIDIA GeForce GTX 1650 Ti",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1081101176832",
+      "used": "20413214720"
+    }
+  },
+  "memory": {
+    "total": "8197787648"
+  },
+  "cpu": {
+    "count": 4,
+    "countLogical": 8
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce GTX 1650 Ti",
+      "memoryTotal": "4294967296",
+      "architecture": "Turing"
+    }
+  ],
+  "cudaVersion": "12.7"
+}

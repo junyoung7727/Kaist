@@ -1,0 +1,1 @@
+{"val_mse_entanglement":0.0012124311178922653,"epoch":2,"train_grad_norm":12.865083441106519,"val_mse_expressibility":3.4957664012908936,"_timestamp":1.7491836923254178e+09,"train_loss":2.2620440817286824,"_runtime":13.174417134,"val_mse_fidelity":0.08801295608282089,"_step":1,"_wandb":{"runtime":15}}

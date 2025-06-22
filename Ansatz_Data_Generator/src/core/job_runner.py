@@ -218,7 +218,7 @@ def run_mega_expressibility_batch(circuit_metadata_list, ibm_backend):
     
     print(f"📊 설정: {S}개 파라미터 샘플 × {shadow_size}개 쉐도우 측정")
     print(f"🧰 메모리 최적화: 한 번에 최대 {meta_per_batch}개 회로 메타데이터 처리")
-    
+
     # 회로 메타데이터를 배치로 나누기
     meta_batches = [circuit_metadata_list[i:i + meta_per_batch] 
                    for i in range(0, len(circuit_metadata_list), meta_per_batch)]
@@ -226,7 +226,61 @@ def run_mega_expressibility_batch(circuit_metadata_list, ibm_backend):
     print(f"📦 총 {len(meta_batches)}개 메타데이터 배치로 처리 예정")
     
     # 메타데이터 배치별로 처리
-    all_results = {}  # 모든 결과를 저장할 딕셔너리
+    for meta_batch_idx, meta_batch in enumerate(meta_batches):
+        print(f"\n🔄 메타데이터 배치 {meta_batch_idx+1}/{len(meta_batches)} 처리 중...")
+        
+        # 이 배치에서 처리할 회로 메타데이터
+        batch_start_idx = meta_batch_idx * meta_per_batch
+        
+        # 이 배치의 회로에 대한 쉐도우 회로 생성
+        shadow_circuits = []  # 이 배치의 쉐도우 회로 목록
+        circuit_mapping = []   # (circuit_idx, param_sample_idx, bases_used)
+        
+        for batch_offset, circuit_info in enumerate(meta_batch):
+            circuit_idx = batch_start_idx + batch_offset
+            try:
+                base_circuit = circuit_info.get("qiskit_circuit")
+                if not base_circuit:
+                    print(f"⚠️ 회로 {circuit_idx}: qiskit_circuit 없음, 건너뜀")
+                    circuit_results[circuit_idx] = {
+                        "expressibility_value": float('nan'),
+                        "method": "skipped_no_base_circuit",
+                        "error": "Qiskit circuit not found in metadata"
+                    }
+                    continue
+                    
+                n_qubits = base_circuit.num_qubits
+                print(f"  📝 회로 {circuit_idx+1}/{len(circuit_metadata_list)}: {n_qubits}큐빗, {S}개 샘플 생성 중...")
+                
+                # 각 파라미터 샘플에 대해 쉐도우 회로 생성
+                for param_idx in range(S):
+                    # 쉐도우 회로 생성
+                    shadow_circuit, bases_used = expressibility_calculator._create_shadow_circuit(
+                        base_circuit, n_qubits
+                    )
+                    
+                    # 배치 리스트에 추가
+                    shadow_circuits.append(shadow_circuit)
+                    circuit_mapping.append((circuit_idx, param_idx, bases_used))
+                    
+            except Exception as e:
+                print(f"⚠️ 회로 {circuit_idx} 쉐도우 생성 오류: {str(e)}")
+                circuit_results[circuit_idx] = {
+                    "expressibility_value": float('nan'),
+                    "method": "failed_shadow_generation",
+                    "error": str(e)
+                }
+        
+        # 이 메타 배치에 생성된 회로 수 확인
+        meta_batch_circuit_count = len(shadow_circuits)
+        print(f"🎯 배치 {meta_batch_idx+1}: {meta_batch_circuit_count}개 쉐도우 회로 생성 완료")
+        
+        if meta_batch_circuit_count == 0:
+            print("  ⏩ 실행할 회로 없음, 다음 배치로 건너뜀")
+            continue
+    
+    # 최종 결과 반환
+    return circuit_results
     
     for meta_batch_idx, meta_batch in enumerate(meta_batches):
         print(f"\n🔄 메타데이터 배치 {meta_batch_idx+1}/{len(meta_batches)} 처리 중...")
