@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.config import config
+from src.core.circuit_base import QuantumCircuitBase  # QuantumCircuitBase 클래스 임포트
 
 
 def generate_all_circuits() -> List[Dict[str, Any]]:
@@ -21,7 +22,7 @@ def generate_all_circuits() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: 생성된 회로 정보 목록
     """
     # 지연 임포트 패턴 유지
-    from quantum_base import QuantumCircuitBase
+    from src.core.circuit_base import QuantumCircuitBase
     
     # 중앙화된 구성에서 쿠빗 설정 가져오기
     # 속성 접근 방식 사용

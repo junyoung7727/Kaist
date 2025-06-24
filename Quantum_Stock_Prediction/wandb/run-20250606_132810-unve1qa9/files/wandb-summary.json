@@ -1,1 +1,0 @@
-{"_runtime":214.423702994,"_wandb":{"runtime":9164},"val_mse_fidelity":0.028713351115584373,"_step":49,"val_mse_expressibility":0.6924881339073181,"_timestamp":1.7491843052110987e+09,"epoch":50,"train_grad_norm":1.491044822430591,"train_loss":0.017173238251453792,"val_mse_entanglement":0.00014439443475566804}

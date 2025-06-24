@@ -31,15 +31,15 @@ IBM_BACKEND = {
 
 # 데이터 생성 설정 - 중앙집중식 관리를 위해 추가
 DATA_GENERATION = {
-    "qubit_presets": [5, 10, 15, 20],  # 쿠빗 수 리스트
+    "qubit_presets": [5],  # 쿠빗 수 리스트
     "batch_size": 50,                 # 배치 크기
     "max_batches": 10,                # 최대 배치 수
-    "depth_presets": [1, 2, 3, 4, 5, 6]   # 깊이 리스트
+    "depth_presets": [1,2,3]   # 깊이 리스트
 }
 
 # 회로 생성 파라미터
 CIRCUIT_GENERATION_PARAMS = {
-    "two_qubit_ratios": [0.3, 0.5, 0.7],  # 2쿠빗 게이트 비율 리스트
+    "two_qubit_ratios": [0.3],  # 2쿠빗 게이트 비율 리스트
     "circuits_per_config": 1,                     # 각 회로 설정당 생성할 회로 수
     "generation_strategy": "hardware_efficient"     # 회로 생성 전략
 }
@@ -67,7 +67,7 @@ EXPRESSIBILITY = {
     "backend_shots": 256,   # IBM 백엔드 측정 횟수
     "confidence_level": 0.95,  # 신뢰 수준
     "shadow_measurements": 100,  # Classical shadow 측정 수
-    "distance_metric": "MSE"
+    "distance_metric": "kl"
 }
 
 # 메타데이터 설정

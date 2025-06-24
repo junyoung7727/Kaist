@@ -23,7 +23,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # 리팩토링된 모듈 임포트
 from src.core.circuit_generator import generate_all_circuits
 from src.core.qiskit_helper import convert_to_qiskit_circuits
-from src.core.job_runner import run_mega_job, calculate_optimal_shots_and_batching
+from src.core.job_runner import run_analysis_job, calculate_optimal_shots_and_batching
 from src.core.result_processor import process_mega_results, save_mega_results, analyze_two_qubit_ratio_results
 from src.utils.file_utils import setup_directories
 
@@ -112,28 +112,25 @@ def run_mega_job_generator(preset_name: Optional[str] = None):
             print("❌ Qiskit 회로 변환 실패!")
             return
         
-        # 배치 최적화 계산 - config 속성 접근 사용
-        batch_info = calculate_optimal_shots_and_batching(
-            total_circuits=len(qiskit_circuits),
-            target_total_shots=config.ibm_backend.target_total_shots,  # 속성 접근 방식
-            max_executions=config.ibm_backend.max_executions_per_job  # 속성 접근 방식
-        )
+        # 새로운 두 단계 실행 흐름 사용 (피델리티 및 표현력 계산)
+        print(f"\n🧪 양자 회로 분석 시작: {len(circuit_metadata)}개 회로")
+        print("   1단계: 피델리티 계산 (역회로 U†U 실행)")
+        print("   2단계: 표현력 계산 (파라미터 샘플별 회로 실행)")
         
-        # IBM 백엔드에서 배치 실행
-        optimal_shots = batch_info["optimal_shots"]
-        result, execution_time, updated_metadata = run_mega_job(
-            qiskit_circuits,
-            circuit_metadata,
-            ibm_backend,
-            shots=optimal_shots
-        )
+        # run_analysis_job 함수 호출 - 두 단계 작업 수행
+        analysis_results = run_analysis_job(circuit_metadata, ibm_backend)
         
-        if result is None:
-            print("❌ 회로 실행 실패!")
+        if analysis_results is None:
+            print("❌ 회로 분석 실패!")
             return
         
+        # 결과 처리 - analysis_results 객체를 process_mega_results 함수에 전달
+        # 기존 함수를 재사용하면서 분석 결과를 적합하게 변환
+        execution_time = time.time() - start_time
+        print(f"\n⏱️ 총 실행 시간: {execution_time:.2f}초")
+        
         # 결과 처리
-        all_results = process_mega_results(result, updated_metadata, execution_time, ibm_backend)
+        all_results = process_mega_results(analysis_results, circuit_metadata, execution_time, ibm_backend)
         
         # 결과 저장
         save_info = save_mega_results(all_results, None)

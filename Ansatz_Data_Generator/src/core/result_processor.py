@@ -23,14 +23,51 @@ from src.config import config # Ensure config is imported
 from data_manager import save_experiment_hdf5
 
 
-def process_mega_results(result, circuit_metadata, execution_time, ibm_backend):
+def make_json_serializable(obj):
     """
-    메가 잡(Mega job) 결과 처리 - 실제 측정 데이터를 분석합니다.
+    재귀적으로 객체를 JSON 직렬화 가능한 형태로 변환합니다.
+    QuantumCircuit 등의 객체는 문자열 표현으로 변환됩니다.
+    """
+    if hasattr(obj, '__dict__'):
+        # QuantumCircuit 등의 복잡한 객체
+        if hasattr(obj, 'name') and hasattr(obj, 'num_qubits'):
+            return {
+                "type": "QuantumCircuit",
+                "name": getattr(obj, 'name', 'unnamed'),
+                "num_qubits": getattr(obj, 'num_qubits', 0),
+                "depth": getattr(obj, 'depth', lambda: 0)(),
+                "size": getattr(obj, 'size', lambda: 0)()
+            }
+        else:
+            # 다른 객체들은 딕셔너리로 변환
+            try:
+                return {k: make_json_serializable(v) for k, v in obj.__dict__.items() 
+                       if not k.startswith('_')}
+            except:
+                return str(obj)
+    elif isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, (int, float, str, bool)) or obj is None:
+        return obj
+    elif hasattr(obj, 'tolist'):  # numpy arrays
+        return obj.tolist()
+    else:
+        # 직렬화할 수 없는 객체는 문자열로 변환
+        return str(obj)
+
+
+def process_mega_results(analysis_results, circuit_metadata, execution_time, ibm_backend):
+    """
+    메가 잡(Mega job) 분석 결과 처리 - 피델리티 및 표현력 분석 결과를 처리합니다.
     
     Args:
-        result: IBM 백엔드에서 실행된 결과 객체입니다.
+        analysis_results (Dict): run_analysis_job에서 반환된 분석 결과
+            (회로별 피델리티와 표현력 값이 포함됨)
         circuit_metadata (List[Dict]): 각 회로에 대한 메타데이터 목록입니다.
-        execution_time (float): 전체 잡 실행에 소요된 시간(초)입니다.
+        execution_time (float): 전체 작업 실행에 소요된 시간(초)입니다.
+        ibm_backend: IBM 백엔드 관리 객체
         
     Returns:
         List[Dict]: 각 회로별로 처리된 결과의 목록입니다.
@@ -40,97 +77,82 @@ def process_mega_results(result, circuit_metadata, execution_time, ibm_backend):
         calculate_robust_fidelity_mega,
         calculate_measurement_statistics
     )
-    from src.core.job_runner import run_mega_expressibility_batch
     
-    print(f"\n🔬 메가 잡 결과 처리 시작 ({len(circuit_metadata)}개 회로)")
+    print(f"\n🔬 메가 잡 분석 결과 처리 시작 ({len(circuit_metadata)}개 회로)")
     
-    # 메가 배치 표현력 계산 - 모든 회로에 대해 한 번에 실행
-    print("🚀 메가 배치 표현력 계산 실행 중...")
-    mega_expressibility_results = run_mega_expressibility_batch(circuit_metadata, ibm_backend)
-    print(f"✅ 메가 배치 표현력 계산 완료 ({len(mega_expressibility_results)}개 결과)")
+    # 피델리티 및 표현력 계산 결과는 이미 analysis_results에 포함됨
+    print(f"📊 분석 결과 포맷팅 중... ({len(analysis_results)}개 회로 데이터)")
     
     all_results = []
     
-    # 각 회로별로 결과 처리
-    print("📊 회로별 결과 분석 중...")
+    # 회로 인덱스별로 결과 처리
+    print("📊 회로별 결과 통합 중...")
     
-    for circuit_idx, circuit_result in enumerate(tqdm(result, desc="회로 처리")):
+    # 모든 회로 메타데이터를 순회
+    for circuit_idx, metadata in enumerate(tqdm(circuit_metadata, desc="회로 처리")):
         try:
-            # 메타데이터 가져오기
-            metadata = circuit_metadata[circuit_idx] if circuit_idx < len(circuit_metadata) else {}
-            n_qubits = metadata.get('n_qubits', 0)
-            
-            # 측정 결과 가져오기
-            if hasattr(circuit_result, 'data'):
-                if hasattr(circuit_result.data(), '__iter__'):
-                    counts = circuit_result.data()[0].get("meas", {})
-                else:
-                    counts = circuit_result.data().get("meas", {})
-            elif hasattr(circuit_result, 'get_counts'):
-                counts = circuit_result.get_counts()
-            else:
-                counts = getattr(circuit_result, 'counts', {})
-            
-            if not counts:
-                print(f"⚠️ 회로 {circuit_idx}: 측정 결과 없음")
+            # 회로가 분석 결과에 없으면 건너뜀
+            if circuit_idx not in analysis_results:
+                print(f"⚠️ 회로 {circuit_idx}: 분석 결과 없음")
                 continue
             
-            # 비트 문자열 길이 정규화
-            total_counts = sum(counts.values())
+            # 회로 분석 결과 가져오기
+            circuit_analysis = analysis_results[circuit_idx]
+            
+            # 메타데이터 기본 정보 추출
+            n_qubits = metadata.get('n_qubits', 0)
+            depth = metadata.get('depth', 0)
+            circuit_name = metadata.get('name', f"circuit_{circuit_idx}")
+            gate_counts = metadata.get('gate_counts', {})
+            circuit_type = metadata.get('circuit_type', 'unknown')
+            
+            # 피델리티 정보 추출
+            fidelity = circuit_analysis.get('fidelity', 0.0)
+            fidelity_method = circuit_analysis.get('fidelity_method', 'not_available')
+            
+            # 표현력 정보 추출 (있을 경우)
+            expressibility = circuit_analysis.get('expressibility', 0.0)
+            expressibility_method = circuit_analysis.get('expressibility_method', 'not_available')
+            distance_from_haar = circuit_analysis.get('distance_from_haar', 1.0)
+            
+            # 측정 통계 및 오류율 계산에 필요한 기본 값들
+            total_counts = 0
             processed_counts = {}
+            zero_state_probability = 0.0
             
-            for bit_str, count in counts.items():
-                if len(bit_str) > n_qubits:
-                    bit_str = bit_str[:n_qubits]
-                elif len(bit_str) < n_qubits:
-                    bit_str = bit_str.zfill(n_qubits)
-                
-                if bit_str in processed_counts:
-                    processed_counts[bit_str] += count
-                else:
-                    processed_counts[bit_str] = count
+            # 피델리티 값을 통해 모델링된 피델리티 지표 계산
+            error_rates = {
+                "gate_error_rate": 1.0 - fidelity if isinstance(fidelity, (int, float)) else 1.0,
+                "circuit_error_probability": 1.0 - fidelity if isinstance(fidelity, (int, float)) else 1.0
+            }
             
-            # 0 상태(zero state) 확률을 기반으로 단순 피델리티를 계산합니다.
-            zero_state = '0' * n_qubits
-            zero_count = processed_counts.get(zero_state, 0)
-            zero_state_probability = zero_count / total_counts if total_counts > 0 else 0
+            # 강화 피델리티 - 업데이트된 시스템에서는 직접 측정된 값 사용
+            robust_fidelity = fidelity
             
-            # 다양한 오류율 지표를 계산합니다.
-            error_rates = calculate_error_rates_mega(
-                processed_counts,
-                n_qubits,
-                total_counts
-            )
+            # 측정 통계 - 레거시 호환성을 위해 임의의 값 사용
+            measurement_statistics = {
+                "entropy": 0.0,
+                "unique_states": 1
+            }
             
-            # Robust 피델리티를 계산합니다.
-            robust_fidelity = calculate_robust_fidelity_mega(
-                processed_counts,
-                n_qubits,
-                total_counts
-            )
+            # 표현력 정보 구성
+            circuit_expressibility = {
+                "value": expressibility if isinstance(expressibility, (int, float)) else 0.0,
+                "method": expressibility_method,
+                "distance_from_haar": distance_from_haar
+            }
             
-            # 측정 결과에 대한 추가 통계치를 계산합니다.
-            measurement_stats = calculate_measurement_statistics(
-                processed_counts,
-                n_qubits
-            )
-            
-            # 메가 배치에서 미리 계산된 표현력 결과 가져오기
-            expressibility_result = mega_expressibility_results.get(circuit_idx, {
-                "expressibility_value": float('nan'),
-                "method": "not_calculated",
-                "error": "Not found in mega batch results"
-            })
-                
-            # 계산된 모든 지표를 포함하는 실행 결과 딕셔너리를 구성합니다.
-            execution_result = {
-                "zero_state_probability": zero_state_probability,
-                "measurement_counts": processed_counts,
-                "measured_states": total_counts,
-                "error_rates": error_rates,
-                "robust_fidelity": robust_fidelity,
-                "measurement_statistics": measurement_stats,
-                "expressibility": expressibility_result,  # 메가 배치 결과 사용
+            # 피델리티 계산 및 추가 분석
+            output_result = {
+                "circuit_index": circuit_idx,
+                "gate_metrics": error_rates,
+                "fidelity": {
+                    "simple": fidelity,  # 이제 직접 피델리티 값 사용
+                    "robust": robust_fidelity,
+                    "method": fidelity_method
+                },
+                "expressibility": circuit_expressibility,
+                "measurement_statistics": measurement_statistics,
                 "execution_metadata": {
                     "circuit_index": circuit_idx,
                     "execution_time": execution_time,
@@ -139,24 +161,31 @@ def process_mega_results(result, circuit_metadata, execution_time, ibm_backend):
                 }
             }
             
-            # 메타데이터와 실행 결과를 결합
-            complete_result = {**metadata, **execution_result}
-            all_results.append(complete_result)
+            # 메타데이터에서 추가 정보 추출
+            if circuit_idx < len(circuit_metadata):
+                circuit_meta = circuit_metadata[circuit_idx]
+                output_result.update(circuit_meta)
+                
+                # 특별히 중요한 정보는 별도로 그룹화
+                output_result["additional_metrics"] = {
+                    "depth": depth,
+                    "width": n_qubits
+                }
+            
+            # 최종 결과에 추가
+            all_results.append(output_result)
             
         except Exception as e:
-            print(f"⚠️ 회로 {circuit_idx} 처리 중 오류: {str(e)}")
-            # 오류 발생 시에도 기본 결과 구조 유지
+            print(f"⚠️ 회로 {circuit_idx} 처리 오류: {str(e)}")
             error_result = {
                 "circuit_index": circuit_idx,
-                "error": str(e),
-                "zero_state_probability": float('nan'),
-                "measurement_counts": {},
-                "measured_states": 0,
-                "error_rates": {},
-                "robust_fidelity": float('nan'),
-                "measurement_statistics": {},
+                "fidelity": {
+                    "simple": float('nan'),
+                    "robust": float('nan'),
+                    "method": "processing_error"
+                },
                 "expressibility": {
-                    "expressibility_value": float('nan'),
+                    "value": float('nan'),
                     "method": "processing_error",
                     "error": str(e)
                 },
@@ -196,7 +225,7 @@ def save_mega_results(all_results, training_circuits):
     results_dir = "experiments/results"
     os.makedirs(results_dir, exist_ok=True)
     
-    # JSON 파일에 저장할 전체 데이터 구조를 준비합니다.
+    # 결과 데이터 구조를 준비합니다.
     result_data = {
         "experiment_type": "mega_job",
         "timestamp": timestamp,
@@ -211,8 +240,10 @@ def save_mega_results(all_results, training_circuits):
     file_prefix = config.get('experiment_file_prefix', 'mega_job')
     json_filename = f"{results_dir}/{file_prefix}_results_{timestamp}.json"
     try:
+        # JSON 직렬화 가능한 형태로 변환
+        serializable_data = make_json_serializable(result_data)
         with open(json_filename, 'w') as f:
-            json.dump(result_data, f, indent=2)
+            json.dump(serializable_data, f, indent=2)
         print(f"   JSON 파일로 저장 완료: {json_filename}")
     except Exception as e:
         print(f"⚠️ JSON 저장 실패: {str(e)}")
@@ -221,31 +252,33 @@ def save_mega_results(all_results, training_circuits):
     try:
         summary_list = []
         for result in all_results:
-            execution_result = result.get("execution_result", {})
-            circuit_properties = result.get("circuit_properties", {})
+            # 새로운 결과 구조에서 정보 추출
+            fidelity = result.get("fidelity", {})
+            expressibility = result.get("expressibility", {})
+            additional_metrics = result.get("additional_metrics", {})
             
             # CSV에 저장할 주요 회로 정보를 추출합니다.
             row = {
-                "circuit_id": result.get("circuit_id", -1),
+                "circuit_index": result.get("circuit_index", -1),
                 "config_group": result.get("config_group", ""),
                 "n_qubits": result.get("n_qubits", 0),
-                "depth": result.get("depth", 0),
+                "depth": result.get("depth", 0) or additional_metrics.get("depth", 0),
                 "two_qubit_ratio_target": result.get("two_qubit_ratio_target", 0),
-                "zero_state_prob": execution_result.get("zero_state_probability", 0),
-                "robust_fidelity": execution_result.get("robust_fidelity", 0),
+                "zero_state_prob": fidelity.get("simple", 0),
+                "robust_fidelity": fidelity.get("robust", 0),
+                "fidelity_method": fidelity.get("method", "unknown")
             }
             
             # 표현력 지표 추가
-            expressibility = execution_result.get("expressibility", {})
             if isinstance(expressibility, dict):
-                # 기본 표현력 점수 및 엔트로피
-                row["expressibility_score"] = expressibility.get("expressibility_score", None)
-                row["expressibility_entropy"] = expressibility.get("entropy", None)
+                # 기본 표현력 값
+                row["expressibility_score"] = expressibility.get("value", None)
+                row["expressibility_method"] = expressibility.get("method", "unknown")
+                row["distance_from_haar"] = expressibility.get("distance_from_haar", 1.0)
                 
-                # 추가적인 거리 기반 표현력 측정 지표들
-                distance_metrics = expressibility.get("distance_metrics", {})
-                if isinstance(distance_metrics, dict):
-                    for metric_name, value in distance_metrics.items():
+                # 추가적인 표현력 측정 지표들이 있다면 추가
+                for metric_name, value in expressibility.items():
+                    if metric_name not in ["value", "method", "distance_from_haar"]:
                         row[f"expressibility_{metric_name}"] = value
             
             summary_list.append(row)
@@ -295,30 +328,33 @@ def analyze_two_qubit_ratio_results(all_results):
     
     for result in all_results:
         try:
-            execution_result = result.get("execution_result", {})
+            # 새로운 결과 구조에서 정보 추출
+            fidelity = result.get("fidelity", {})
+            expressibility = result.get("expressibility", {})
+            additional_metrics = result.get("additional_metrics", {})
             
-            # 핵심 메트릭(지표)을 추출합니다.
+            # 핵심 메트릭(지표)를 추출합니다.
             row = {
-                "circuit_id": result.get("circuit_id", -1),
+                "circuit_index": result.get("circuit_index", -1),
                 "config_group": result.get("config_group", ""),
                 "n_qubits": result.get("n_qubits", 0),
-                "depth": result.get("depth", 0),
+                "depth": result.get("depth", 0) or additional_metrics.get("depth", 0),
                 "two_qubit_ratio_target": result.get("two_qubit_ratio_target", 0),
-                "zero_state_prob": execution_result.get("zero_state_probability", 0),
-                "robust_fidelity": execution_result.get("robust_fidelity", 0),
+                "zero_state_prob": fidelity.get("simple", 0),
+                "robust_fidelity": fidelity.get("robust", 0),
+                "fidelity_method": fidelity.get("method", "unknown")
             }
             
             # 표현력 지표 추가
-            expressibility = execution_result.get("expressibility", {})
             if isinstance(expressibility, dict):
-                # 기본 표현력 점수 및 엔트로피
-                row["expressibility_score"] = expressibility.get("expressibility_score", None)
-                row["expressibility_entropy"] = expressibility.get("entropy", None)
+                # 기본 표현력 값
+                row["expressibility_score"] = expressibility.get("value", None)
+                row["expressibility_method"] = expressibility.get("method", "unknown")
+                row["distance_from_haar"] = expressibility.get("distance_from_haar", 1.0)
                 
-                # 추가적인 거리 기반 표현력 측정 지표들
-                distance_metrics = expressibility.get("distance_metrics", {})
-                if isinstance(distance_metrics, dict):
-                    for metric_name, value in distance_metrics.items():
+                # 추가적인 표현력 측정 지표들이 있다면 추가
+                for metric_name, value in expressibility.items():
+                    if metric_name not in ["value", "method", "distance_from_haar", "error"]:
                         row[f"expressibility_{metric_name}"] = value
             
             analysis_data.append(row)

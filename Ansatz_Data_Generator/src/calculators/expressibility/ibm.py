@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 
 # 내부 모듈 임포트
 from src.calculators.expressibility.base import ExpressibilityCalculatorBase
+from src.calculators.expressibility.shadow_calculator import SimpleClassicalShadowCalculator
 from src.config import config
 
 
@@ -36,11 +37,11 @@ class IBMExpressibilityCalculator(ExpressibilityCalculatorBase):
         # 기본 회로 복사
         shadow_circuit = base_circuit.copy()
         
-        # 1. 크로노스 상태 초기화
-        for q in range(n_qubits):
-            shadow_circuit.reset(q)
+        # reset 제거! - ansatz 상태를 보존해야 함
+        # for q in range(n_qubits):
+        #     shadow_circuit.reset(q)
         
-        # 2. 랭덤 로테이션 추가 (Identity 포함)
+        # 랭덤 로테이션 추가 (Identity 포함)
         pauli_bases = ['I', 'X', 'Y', 'Z']  # Identity 추가
         bases_used = []
         
@@ -58,7 +59,7 @@ class IBMExpressibilityCalculator(ExpressibilityCalculatorBase):
                 shadow_circuit.h(q)
             # Z basis: 아무 게이트도 적용하지 않음 (계산 기저와 동일)
         
-        # 3. 측정 추가
+        # 측정 추가
         shadow_circuit.measure_all()
         
         return shadow_circuit, bases_used
@@ -142,7 +143,7 @@ class IBMExpressibilityCalculator(ExpressibilityCalculatorBase):
         return all_measurements, all_bases
 
 
-    def convert_ibm_to_classical_shadow(self, measurement_counts: Dict[str, int], bases_used: List[str], n_qubits: int, shadow_shots: int) -> Dict[str, Any]:
+    def convert_ibm_to_classical_shadow(self, measurement_counts: Dict[str, int], bases_used: List[str], n_qubits: int, shadow_shots: int) -> List[Dict[str, Any]]:
         """
         IBM 측정 결과를 Classical Shadow 데이터 형식으로 변환
         
@@ -153,98 +154,37 @@ class IBMExpressibilityCalculator(ExpressibilityCalculatorBase):
             shadow_shots (int): Shadow 샷 수
             
         Returns:
-            Dict[str, Any]: Classical Shadow 데이터 형식
+            List[Dict[str, Any]]: Classical Shadow 데이터 형식 (개별 샘플 리스트)
         """
         measurements, bases = self._expand_ibm_to_classical_shadow_data(
             measurement_counts, bases_used, n_qubits, shadow_shots
         )
         
-        # Shadow 데이터 형식으로 변환
-        shadow_data = {
-            "measurements": measurements,
-            "bases": bases,
-            "n_qubits": n_qubits,
-            "shots": len(measurements)
-        }
+        # Shadow 데이터를 개별 샘플 형식으로 변환
+        shadow_data_list = []
+        for i in range(len(measurements)):
+            sample = {
+                "measurement": measurements[i],  # 개별 측정 결과 [0,1,0,1,1]
+                "basis": bases[i]               # 개별 기저 ["X","Y","Z","X","Y"]
+            }
+            shadow_data_list.append(sample)
         
-        return shadow_data
+        return shadow_data_list
 
 
-    def estimate_pauli_expectations_from_shadows(self, shadow_data_list: List[Dict], n_qubits: int) -> Dict[str, float]:
+    def estimate_pauli_expectations_from_shadows(self, shadow_data_list: List[Dict[str, Any]], n_qubits: int) -> Dict[str, float]:
         """
-        Classical Shadow 데이터로부터 Pauli 연산자 기댓값 추정
+        Shadow 데이터에서 Pauli 연산자 기댓값을 추정합니다.
         
         Args:
-            shadow_data_list (List[Dict]): Classical Shadow 데이터 목록
-            n_qubits (int): 큐빗 수
+            shadow_data_list: Shadow 측정 데이터 리스트
+            n_qubits: 큐빗 수
             
         Returns:
             Dict[str, float]: Pauli 연산자 기댓값 딕셔너리
         """
-        # Pauli 연산자 기댓값 초기화 (Identity 포함)
-        pauli_expectations = {}
-        pauli_ops = ["I", "X", "Y", "Z"]  # Identity 추가
-        
-        # 1-local Pauli 연산자 (각 큐빗별)
-        for q in range(n_qubits):
-            for op in pauli_ops:
-                pauli_expectations[f"{op}{q}"] = 0.0
-        
-        # 2-local Pauli 연산자 (큐빗 쌍별)
-        for q1 in range(n_qubits):
-            for q2 in range(q1 + 1, n_qubits):
-                for op1 in pauli_ops:
-                    for op2 in pauli_ops:
-                        pauli_expectations[f"{op1}{q1}{op2}{q2}"] = 0.0
-        
-        # 각 Shadow 데이터에서 기댓값 추정
-        total_samples = len(shadow_data_list)
-        if total_samples == 0:
-            return pauli_expectations
-        
-        # 각 Shadow에서 측정값 추정
-        for shadow_data in shadow_data_list:
-            bases = shadow_data.get("bases", [])
-            measurements = shadow_data.get("measurements", [])
-            
-            for basis, meas in zip(bases, measurements):
-                # 1-local Pauli 연산자 추정
-                for q1 in range(n_qubits):
-                    for op1 in pauli_ops:
-                        # 연산자가 현재 측정 기저와 일치하면 값 추정
-                        if basis[q1] == op1:
-                            pauli_op_name = f"{op1}{q1}"
-                            if op1 == 'I':
-                                # Identity: 항상 1
-                                pauli_val = 1.0
-                            else:
-                                # 측정 결과에 따라 +1 또는 -1
-                                pauli_val = 1 - 2 * meas[q1]  # 0 -> +1, 1 -> -1
-                            pauli_expectations[pauli_op_name] += pauli_val / total_samples
-                
-                # 2-local Pauli 연산자 추정
-                for q1 in range(n_qubits):
-                    for q2 in range(q1 + 1, n_qubits):
-                        for op1 in pauli_ops:
-                            for op2 in pauli_ops:
-                                # 두 큐빗 모두 해당 기저에서 측정되었는지 확인
-                                if basis[q1] == op1 and basis[q2] == op2:
-                                    pauli_op_name = f"{op1}{q1}{op2}{q2}"
-                                    if op1 == 'I' and op2 == 'I':
-                                        # II: 항상 1
-                                        pauli_val = 1.0
-                                    elif op1 == 'I':
-                                        # IX, IY, IZ: 두 번째 큐빗만 고려
-                                        pauli_val = 1 - 2 * meas[q2] if op2 != 'I' else 1.0
-                                    elif op2 == 'I':
-                                        # XI, YI, ZI: 첫 번째 큐빗만 고려
-                                        pauli_val = 1 - 2 * meas[q1] if op1 != 'I' else 1.0
-                                    else:
-                                        # XX, XY, XZ, YX, YY, YZ, ZX, ZY, ZZ
-                                        pauli_val = (1 - 2 * meas[q1]) * (1 - 2 * meas[q2])
-                                    pauli_expectations[pauli_op_name] += pauli_val / total_samples
-        
-        return pauli_expectations
+        calculator = SimpleClassicalShadowCalculator(n_qubits)
+        return calculator.calculate_pauli_expectations(shadow_data_list)
 
 
     def get_haar_pauli_expectations(self, n_qubits: int) -> Dict[str, float]:
@@ -439,6 +379,26 @@ class IBMExpressibilityCalculator(ExpressibilityCalculatorBase):
         
         return (float(lower), float(upper))
 
+    def calculate_distance_from_haar_random(self, estimated_moments, n_qubits, distance_metric):
+        """
+        추정된 Pauli 모멘트와 Haar 분포의 이론적 모멘트 간의 거리 계산
+        
+        Args:
+            estimated_moments (Dict[str, float]): 추정된 Pauli 연산자별 기댓값
+            n_qubits (int): 큐빗 수
+            
+        Returns:
+            float: Haar 분포로부터의 거리 (0에 가까울수록 Haar 분포에 가까움)
+        """
+        # Haar 분포의 이론적 Pauli 기댓값 계산
+        haar_moments = self.get_haar_pauli_expectations(n_qubits)
+        
+        distance = self.calculate_shadow_distance(
+            estimated_moments, haar_moments, distance_metric
+        )
+        
+        return distance
+    
     def calculate_expressibility_from_real_quantum_classical_shadow(self, ibm_backend, base_circuit, circuit_info, n_qubits, samples=None) -> Dict[str, Any]:
         """
         실제 IBM 양자 컴퓨터에서 Classical Shadow 방법론을 사용하여 표현력 계산

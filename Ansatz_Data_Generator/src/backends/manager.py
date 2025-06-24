@@ -251,10 +251,48 @@ class IBMBackendManager:
                     # SamplerV2 결과에서 각 회로의 카운트 추출
                     pub_result = result[i]
                     
-                    # 카운트 추출
+                    # 카운트 추출 - DataBin 오류 해결
+                    counts_dict = {}
+                    
                     if hasattr(pub_result, 'data') and hasattr(pub_result.data, 'meas'):
                         # 새로운 SamplerV2 API
-                        counts_dict = pub_result.data.meas.get_counts()
+                        meas_data = pub_result.data.meas
+                        
+                        # DataBin 객체 처리
+                        if hasattr(meas_data, 'get_counts'):
+                            try:
+                                counts_dict = meas_data.get_counts()
+                            except TypeError as e:
+                                # DataBin 객체가 callable이 아닌 경우
+                                if hasattr(meas_data, 'array'):
+                                    # 배열 형태의 데이터를 카운트로 변환
+                                    measurements = meas_data.array
+                                    n_qubits = circuits[i].num_qubits
+                                    
+                                    # 측정 결과를 비트 문자열로 변환하고 카운트
+                                    from collections import Counter
+                                    bit_strings = []
+                                    for shot in measurements:
+                                        bit_string = ''.join(str(int(bit)) for bit in shot)
+                                        bit_strings.append(bit_string)
+                                    counts_dict = dict(Counter(bit_strings))
+                                else:
+                                    print(f"  ⚠️ 회로 {i+1}: DataBin 처리 실패, 빈 결과 사용")
+                                    counts_dict = {}
+                        elif hasattr(meas_data, 'array'):
+                            # 직접 배열 접근
+                            measurements = meas_data.array
+                            n_qubits = circuits[i].num_qubits
+                            
+                            from collections import Counter
+                            bit_strings = []
+                            for shot in measurements:
+                                bit_string = ''.join(str(int(bit)) for bit in shot)
+                                bit_strings.append(bit_string)
+                            counts_dict = dict(Counter(bit_strings))
+                        else:
+                            counts_dict = {}
+                            
                     elif hasattr(result, 'quasi_dists') and i < len(result.quasi_dists):
                         # 이전 버전 호환성
                         quasi_dist = result.quasi_dists[i]
@@ -271,6 +309,17 @@ class IBMBackendManager:
                                     counts_dict = meas_data.get_counts()
                                 elif hasattr(meas_data, 'counts'):
                                     counts_dict = meas_data.counts
+                                elif hasattr(meas_data, 'array'):
+                                    # 배열 형태 처리
+                                    measurements = meas_data.array
+                                    n_qubits = circuits[i].num_qubits
+                                    
+                                    from collections import Counter
+                                    bit_strings = []
+                                    for shot in measurements:
+                                        bit_string = ''.join(str(int(bit)) for bit in shot)
+                                        bit_strings.append(bit_string)
+                                    counts_dict = dict(Counter(bit_strings))
                                 else:
                                     counts_dict = {}
                             else:
