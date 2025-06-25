@@ -179,7 +179,22 @@ def run_mega_expressibility_batch(circuit_metadata_list, ibm_backend):
     shadow_size = config.expressibility.shadow_measurements
     max_batch_size = config.ibm_backend.max_batch_size
     
-    # 배치 크기 계산
+    # 메모리 기반 배치 크기 조정
+    try:
+        import psutil
+        avail_mem = psutil.virtual_memory().available
+    except ImportError:
+        avail_mem = None
+    # 대략적 상태벡터 메모리: 16 bytes * 2^max_qubits
+    qubit_presets = config.get('data_generation', {}).get('qubit_presets', [])
+    max_qubits = max(qubit_presets) if qubit_presets else 0
+    mem_per_circuit = 16 * (2 ** max_qubits)
+    if avail_mem:
+        max_circuits_mem = max(1, avail_mem // mem_per_circuit)
+        max_batch_size = min(max_batch_size, max_circuits_mem)
+        print(f"📦 사용 가능한 메모리: {avail_mem/1e9:.2f} GB, 회로당 약 {mem_per_circuit/1e6:.2f} MB => max batch size {max_batch_size}")
+    
+    # 배치 크기 계산 (샘플별 제약 고려)
     meta_per_batch = max(1, max_batch_size // S)
     meta_batches = [circuit_metadata_list[i:i + meta_per_batch] 
                    for i in range(0, len(circuit_metadata_list), meta_per_batch)]
@@ -201,8 +216,22 @@ def run_mega_expressibility_batch(circuit_metadata_list, ibm_backend):
                 continue
             
             # 2. 회로 실행
+            # 2. 회로 실행 전 배치별 동적 메모리 할당
+            if avail_mem:
+                # 해당 배치에서 최대 큐빗 수 계산
+                batch_qubits = []
+                for info in meta_batch:
+                    qc = info.get('qiskit_circuit')
+                    nqb = qc.num_qubits if qc is not None else info.get('n_qubits', 0)
+                    batch_qubits.append(nqb)
+                max_qubits_batch = max(batch_qubits) if batch_qubits else 0
+                mem_per_circ_batch = 16 * (2 ** max_qubits_batch)
+                max_batch_size_batch = min(max_batch_size, max(1, int(avail_mem // mem_per_circ_batch)))
+                print(f"📦 배치 {batch_idx+1}: max_qubits={max_qubits_batch}, mem_per_circ={mem_per_circ_batch/1e6:.2f}MB -> batch_size={max_batch_size_batch}")
+            else:
+                max_batch_size_batch = max_batch_size
             batch_results = _execute_circuits_batch(
-                shadow_circuits, ibm_backend, shadow_size, max_batch_size, batch_idx
+                shadow_circuits, ibm_backend, shadow_size, max_batch_size_batch, batch_idx
             )
             
             if not batch_results:
@@ -459,16 +488,28 @@ def run_analysis_job(circuit_metadata_list, ibm_backend):
     
     # 필터링된 회로에 대해 표현력 계산
     if filtered_circuits:
-        expressibility_results = run_mega_expressibility_batch(filtered_circuits, ibm_backend)
-        
-        # 원래 인덱스로 표현력 결과 매핑
-        for result_idx, (circuit_idx, expr_data) in enumerate(expressibility_results.items()):
-            if result_idx < len(filtered_indices):
-                original_idx = filtered_indices[result_idx]
-                if original_idx in analysis_results:
-                    analysis_results[original_idx]["expressibility"] = expr_data.get("expressibility_value", 0.0)
-                    analysis_results[original_idx]["expressibility_method"] = expr_data.get("method", "")
-                    analysis_results[original_idx]["distance_from_haar"] = expr_data.get("distance_from_haar", 1.0)
+        if config.experiment_mode == "SIMULATOR":
+            from src.calculators.expressibility.simulator import SimulatorExpressibilityCalculator
+            sim_calc = SimulatorExpressibilityCalculator(seed=None)
+            # 시뮬레이터 기반 표현력 계산
+            for idx, circuit_info in enumerate(filtered_circuits):
+                orig_idx = filtered_indices[idx]
+                if orig_idx in analysis_results:
+                    sim_res = sim_calc.calculate_expressibility(circuit_info)
+                    analysis_results[orig_idx]["expressibility"] = sim_res.get("expressibility_value", 0.0)
+                    analysis_results[orig_idx]["expressibility_method"] = sim_res.get("method", "")
+                    # optional: execution time
+                    analysis_results[orig_idx]["execution_time_expr"] = sim_res.get("execution_time", None)
+        else:
+            expressibility_results = run_mega_expressibility_batch(filtered_circuits, ibm_backend)
+            # 원래 인덱스로 표현력 결과 매핑
+            for result_idx, (circuit_idx, expr_data) in enumerate(expressibility_results.items()):
+                if result_idx < len(filtered_indices):
+                    original_idx = filtered_indices[result_idx]
+                    if original_idx in analysis_results:
+                        analysis_results[original_idx]["expressibility"] = expr_data.get("expressibility_value", 0.0)
+                        analysis_results[original_idx]["expressibility_method"] = expr_data.get("method", "")
+                        analysis_results[original_idx]["distance_from_haar"] = expr_data.get("distance_from_haar", 1.0)
     
     print(f"\n✅ 양자 회로 분석 작업 완료: {len(analysis_results)}개 회로 처리됨")
     return analysis_results

@@ -31,16 +31,16 @@ IBM_BACKEND = {
 
 # 데이터 생성 설정 - 중앙집중식 관리를 위해 추가
 DATA_GENERATION = {
-    "qubit_presets": [5],  # 쿠빗 수 리스트
+    "qubit_presets": [5,7,10,15],  # 쿠빗 수 리스트
     "batch_size": 50,                 # 배치 크기
     "max_batches": 10,                # 최대 배치 수
-    "depth_presets": [1,2,3]   # 깊이 리스트
+    "depth_presets": [1,2,3,5]   # 깊이 리스트
 }
 
 # 회로 생성 파라미터
 CIRCUIT_GENERATION_PARAMS = {
-    "two_qubit_ratios": [0.3],  # 2쿠빗 게이트 비율 리스트
-    "circuits_per_config": 1,                     # 각 회로 설정당 생성할 회로 수
+    "two_qubit_ratios": [0.2,0.5,0.8],  # 2쿠빗 게이트 비율 리스트
+    "circuits_per_config": 10,                     # 각 회로 설정당 생성할 회로 수
     "generation_strategy": "hardware_efficient"     # 회로 생성 전략
 }
 
@@ -66,8 +66,18 @@ EXPRESSIBILITY = {
     "simulator_shots": 256,  # 시뮬레이터 측정 횟수
     "backend_shots": 256,   # IBM 백엔드 측정 횟수
     "confidence_level": 0.95,  # 신뢰 수준
-    "shadow_measurements": 100,  # Classical shadow 측정 수
+    "shadow_measurements": 50,  # Classical shadow 측정 수
     "distance_metric": "kl"
+}
+
+# 시뮬레이터 설정
+SIMULATOR = {
+    "max_fidelity_qubits": 20,  # 피델리티 계산을 위한 최대 큐빗 수
+    "fidelity_shots": 256,      # 피델리티 계산용 샷 수
+    "fidelity_kl_num_bins": 100,  # KL 발산 계산용 히스토그램 빈 수
+    "max_expressibility_qubits": 15,  # 표현력 계산을 위한 최대 큐빗 수
+    "enable_noise": False,      # 노이즈 모델 활성화 여부
+    "seed": DEFAULT_SEED        # 시뮬레이터 시드
 }
 
 # 메타데이터 설정
@@ -111,6 +121,7 @@ def get_default_config() -> Dict[str, Any]:
         "experiment_mode": DEFAULT_EXPERIMENT_MODE,
         "circuit": DEFAULT_CIRCUIT.copy(),
         "expressibility": EXPRESSIBILITY.copy(),
+        "simulator": SIMULATOR.copy(),  # 시뮬레이터 설정 추가
         "metadata": METADATA.copy(),
         "paths": PATHS.copy(),
         "logging": LOGGING.copy(),

@@ -218,6 +218,11 @@ def save_mega_results(all_results, training_circuits):
     """
     print("\n💾 실험 결과 저장 중...")
     
+    # 빈 결과 체크
+    if not all_results:
+        print("⚠️ 저장할 결과가 없습니다.")
+        return {"error": "No results to save"}
+    
     # 파일명에 사용될 현재 시각 타임스탬프를 생성합니다.
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
@@ -252,9 +257,18 @@ def save_mega_results(all_results, training_circuits):
     try:
         summary_list = []
         for result in all_results:
+            # 안전한 값 추출 함수
+            def safe_get(obj, key, default=None):
+                if isinstance(obj, dict):
+                    return obj.get(key, default)
+                elif hasattr(obj, key):
+                    return getattr(obj, key, default)
+                else:
+                    return default
+            
             # 새로운 결과 구조에서 정보 추출
-            fidelity = result.get("fidelity", {})
-            expressibility = result.get("expressibility", {})
+            fidelity = result.get("fidelity")
+            expressibility = result.get("expressibility")
             additional_metrics = result.get("additional_metrics", {})
             
             # CSV에 저장할 주요 회로 정보를 추출합니다.
@@ -262,12 +276,23 @@ def save_mega_results(all_results, training_circuits):
                 "circuit_index": result.get("circuit_index", -1),
                 "config_group": result.get("config_group", ""),
                 "n_qubits": result.get("n_qubits", 0),
-                "depth": result.get("depth", 0) or additional_metrics.get("depth", 0),
+                "depth": result.get("depth", 0) or safe_get(additional_metrics, "depth", 0),
                 "two_qubit_ratio_target": result.get("two_qubit_ratio_target", 0),
-                "zero_state_prob": fidelity.get("simple", 0),
-                "robust_fidelity": fidelity.get("robust", 0),
-                "fidelity_method": fidelity.get("method", "unknown")
             }
+            
+            # 피델리티 값 안전하게 추출
+            if isinstance(fidelity, dict):
+                row["zero_state_prob"] = fidelity.get("simple", 0)
+                row["robust_fidelity"] = fidelity.get("robust", 0)
+                row["fidelity_method"] = fidelity.get("method", "unknown")
+            elif isinstance(fidelity, (int, float)):
+                row["zero_state_prob"] = fidelity
+                row["robust_fidelity"] = fidelity
+                row["fidelity_method"] = "simple_value"
+            else:
+                row["zero_state_prob"] = 0
+                row["robust_fidelity"] = 0
+                row["fidelity_method"] = "unknown"
             
             # 표현력 지표 추가
             if isinstance(expressibility, dict):
@@ -279,35 +304,139 @@ def save_mega_results(all_results, training_circuits):
                 # 추가적인 표현력 측정 지표들이 있다면 추가
                 for metric_name, value in expressibility.items():
                     if metric_name not in ["value", "method", "distance_from_haar"]:
-                        row[f"expressibility_{metric_name}"] = value
+                        if isinstance(value, (int, float, str, bool)):
+                            row[f"expressibility_{metric_name}"] = value
+            elif isinstance(expressibility, (int, float)):
+                row["expressibility_score"] = expressibility
+                row["expressibility_method"] = "simple_value"
+                row["distance_from_haar"] = 1.0
+            else:
+                row["expressibility_score"] = None
+                row["expressibility_method"] = "unknown"
+                row["distance_from_haar"] = 1.0
             
             summary_list.append(row)
         
         # 추출된 요약 정보를 Pandas DataFrame으로 변환하여 CSV 파일로 저장합니다.
         if summary_list:
             df = pd.DataFrame(summary_list)
-            # file_prefix is defined above for the json filename
             csv_filename = f"{results_dir}/{file_prefix}_summary_{timestamp}.csv"
             df.to_csv(csv_filename, index=False)
             print(f"   CSV 요약 저장 완료: {csv_filename}")
         
     except Exception as e:
         print(f"⚠️ CSV 요약 저장 실패: {str(e)}")
+        print(f"   오류 세부사항: {type(e).__name__}")
     
-    # 모든 결과 데이터를 HDF5 형식으로 저장합니다 (대용량 데이터에 적합).
+    # 트랜스포머 친화적 형식으로 저장
     try:
-        # file_prefix is defined above for the json filename
-        hdf5_filename = f"{results_dir}/{file_prefix}_data_{timestamp}.h5"
-        save_experiment_hdf5(all_results, hdf5_filename)
-        print(f"   HDF5 데이터 저장 완료: {hdf5_filename}")
+        transformer_data = create_transformer_friendly_format(all_results)
+        transformer_filename = f"{results_dir}/{file_prefix}_transformer_{timestamp}.json"
+        with open(transformer_filename, 'w') as f:
+            json.dump(transformer_data, f, indent=2)
+        print(f"   트랜스포머 형식 저장 완료: {transformer_filename}")
+    except Exception as e:
+        print(f"⚠️ 트랜스포머 형식 저장 실패: {str(e)}")
+    
+    # HDF5 저장 (간소화된 버전)
+    try:
+        if summary_list:  # CSV 데이터가 성공적으로 생성된 경우만
+            df = pd.DataFrame(summary_list)
+            hdf5_filename = f"{results_dir}/{file_prefix}_data_{timestamp}.h5"
+            df.to_hdf(hdf5_filename, key='circuit_data', mode='w')
+            print(f"   HDF5 데이터 저장 완료: {hdf5_filename}")
     except Exception as e:
         print(f"⚠️ HDF5 저장 실패: {str(e)}")
     
     return {
         "timestamp": timestamp,
         "json_file": json_filename,
-        "csv_file": f"{results_dir}/mega_job_summary_{timestamp}.csv",
-        "hdf5_file": f"{results_dir}/mega_job_data_{timestamp}.h5"
+        "csv_file": f"{results_dir}/{file_prefix}_summary_{timestamp}.csv",
+        "hdf5_file": f"{results_dir}/{file_prefix}_data_{timestamp}.h5",
+        "transformer_file": f"{results_dir}/{file_prefix}_transformer_{timestamp}.json"
+    }
+
+
+def create_transformer_friendly_format(all_results):
+    """
+    트랜스포머 모델 훈련에 적합한 형식으로 데이터 변환
+    """
+    transformer_data = []
+    
+    for result in all_results:
+        try:
+            # 기본 회로 메타데이터
+            circuit_record = {
+                "circuit_id": result.get("circuit_index", -1),
+                "n_qubits": result.get("n_qubits", 4),
+                "depth": result.get("depth", 1),
+                "two_qubit_ratio": result.get("two_qubit_ratio_target", 0.0),
+            }
+            
+            # 회로 토큰화 (게이트 시퀀스) - 최상위 레벨에서 추출
+            gates = result.get("gates", [])
+            wires_list = result.get("wires_list", [])
+            params = result.get("params", [])
+            
+            # 간단한 토큰화: gate_type:qubit_indices 형식
+            circuit_tokens = []
+            for i, gate in enumerate(gates):
+                if i < len(wires_list):
+                    wires = wires_list[i]
+                    if isinstance(wires, list):
+                        wire_str = "_".join(map(str, wires))
+                    else:
+                        wire_str = str(wires)
+                    token = f"{gate}:{wire_str}"
+                    circuit_tokens.append(token)
+            
+            circuit_record["circuit_tokens"] = circuit_tokens
+            circuit_record["circuit_sequence"] = " ".join(circuit_tokens)
+            
+            # 타겟 레이블 (회귀 예측용)
+            fidelity = result.get("fidelity")
+            expressibility = result.get("expressibility")
+            
+            # 피델리티 값 추출
+            if isinstance(fidelity, dict):
+                circuit_record["target_fidelity"] = fidelity.get("simple", 0.0)
+            elif isinstance(fidelity, (int, float)):
+                circuit_record["target_fidelity"] = float(fidelity)
+            else:
+                circuit_record["target_fidelity"] = 0.0
+            
+            # 표현력 값 추출
+            if isinstance(expressibility, dict):
+                circuit_record["target_expressibility"] = expressibility.get("value", 0.0)
+            elif isinstance(expressibility, (int, float)):
+                circuit_record["target_expressibility"] = float(expressibility)
+            else:
+                circuit_record["target_expressibility"] = 0.0
+            
+            # 2큐빗 게이트 비율 계산
+            two_qubit_gates = sum(1 for gate in gates if gate.lower() in ['cx', 'cy', 'cz', 'cnot'])
+            total_gates = len(gates)
+            actual_two_qubit_ratio = two_qubit_gates / max(total_gates, 1)
+            circuit_record["actual_two_qubit_ratio"] = actual_two_qubit_ratio
+            
+            transformer_data.append(circuit_record)
+            
+        except Exception as e:
+            print(f"⚠️ 회로 {result.get('circuit_index', 'unknown')} 트랜스포머 형식 변환 실패: {e}")
+            continue
+    
+    return {
+        "format": "transformer_friendly",
+        "description": "Circuit data formatted for transformer model training",
+        "total_circuits": len(transformer_data),
+        "features": [
+            "circuit_id", "n_qubits", "depth", "two_qubit_ratio", 
+            "circuit_tokens", "circuit_sequence"
+        ],
+        "targets": [
+            "target_fidelity", "target_expressibility", "actual_two_qubit_ratio"
+        ],
+        "data": transformer_data
     }
 
 
@@ -354,7 +483,7 @@ def analyze_two_qubit_ratio_results(all_results):
                 
                 # 추가적인 표현력 측정 지표들이 있다면 추가
                 for metric_name, value in expressibility.items():
-                    if metric_name not in ["value", "method", "distance_from_haar", "error"]:
+                    if metric_name not in ["value", "method", "distance_from_haar"]:
                         row[f"expressibility_{metric_name}"] = value
             
             analysis_data.append(row)

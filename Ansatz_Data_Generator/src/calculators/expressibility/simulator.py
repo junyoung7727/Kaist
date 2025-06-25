@@ -12,80 +12,160 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 # 내부 모듈 임포트
 from src.calculators.expressibility.base import ExpressibilityCalculatorBase
 from src.config import config
-from qiskit.quantum_info import Statevector
-from qiskit import transpile
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector, state_fidelity
 
+
+def haar_fidelity_distribution(n_qubits, F_values):
+    """Haar random state의 이론적 피델리티 분포"""
+    N = 2**n_qubits
+    return (N - 1) * (1 - F_values)**(N - 2)
+
+
+def calculate_kl_divergence(measured_hist, theoretical_hist, bin_widths):
+    """KL divergence 계산"""
+    epsilon = 1e-10
+    
+    # 0인 값들을 epsilon으로 대체
+    measured_hist = np.maximum(measured_hist, epsilon)
+    theoretical_hist = np.maximum(theoretical_hist, epsilon)
+    
+    # 정규화
+    measured_hist = measured_hist / np.sum(measured_hist * bin_widths)
+    theoretical_hist = theoretical_hist / np.sum(theoretical_hist * bin_widths)
+    
+    # KL divergence 계산
+    kl_div = np.sum(measured_hist * np.log(measured_hist / theoretical_hist) * bin_widths)
+    
+    return kl_div
+
+
+def create_parametrized_circuit_from_info(circuit_info, n_qubits, random_params=True):
+    """circuit_info를 기반으로 매개변수화된 양자회로 생성"""
+    qc = QuantumCircuit(n_qubits)
+    
+    gates = circuit_info.get("gates", [])
+    wires_list = circuit_info.get("wires_list", [])
+    params = circuit_info.get("params", [])
+    params_idx = circuit_info.get("params_idx", [])
+    
+    # 랜덤 매개변수 생성
+    if random_params and len(params) > 0:
+        random_param_values = np.random.uniform(0, 2*np.pi, len(params))
+    else:
+        random_param_values = params
+    
+    param_counter = 0
+    
+    for i, gate in enumerate(gates):
+        if i >= len(wires_list):
+            break
+            
+        wires = wires_list[i]
+        
+        try:
+            if gate.lower() == 'h':
+                qc.h(wires[0])
+            elif gate.lower() == 'x':
+                qc.x(wires[0])
+            elif gate.lower() == 'y':
+                qc.y(wires[0])
+            elif gate.lower() == 'z':
+                qc.z(wires[0])
+            elif gate.lower() == 'rx':
+                if param_counter < len(random_param_values):
+                    qc.rx(random_param_values[param_counter], wires[0])
+                    param_counter += 1
+            elif gate.lower() == 'ry':
+                if param_counter < len(random_param_values):
+                    qc.ry(random_param_values[param_counter], wires[0])
+                    param_counter += 1
+            elif gate.lower() == 'rz':
+                if param_counter < len(random_param_values):
+                    qc.rz(random_param_values[param_counter], wires[0])
+                    param_counter += 1
+            elif gate.lower() == 'cx' and len(wires) >= 2:
+                qc.cx(wires[0], wires[1])
+            elif gate.lower() == 'cy' and len(wires) >= 2:
+                qc.cy(wires[0], wires[1])
+            elif gate.lower() == 'cz' and len(wires) >= 2:
+                qc.cz(wires[0], wires[1])
+        except Exception:
+            # 잘못된 게이트나 큐빗 인덱스는 무시
+            continue
+    
+    return qc
 
 
 def _calculate_statevector_expressibility(circuit_info: Dict[str, Any], num_samples: Optional[int] = None, num_bins: Optional[int] = None) -> Dict[str, Any]:
     """
-    상태벡터 기반 표현력 계산 (피델리티 분포의 KL 발산)
+    상태벡터 기반 표현력 계산 (개선된 버전)
     
     Args:
-        circuit_info (Dict[str, Any]): 회로 정보
-        num_samples (Optional[int]): 샘플 수
-        num_bins (int): 히스토그램 빈 수
-        
+        circuit_info: 회로 정보 딕셔너리
+        num_samples: 샘플 수 (기본값: config에서 가져옴)
+        num_bins: 히스토그램 빈 수 (기본값: config에서 가져옴)
+    
     Returns:
-        Dict[str, Any]: 표현력 계산 결과
+        표현력 결과 딕셔너리
     """
-    from src.core.circuit_base import QuantumCircuitBase
+    n_qubits = circuit_info.get("n_qubits", 4)
     
-    n_qubits = circuit_info.get("n_qubits")
-    
-    # qubit 제한
-    if n_qubits > config.simulator.max_fidelity_qubits:
-        print(f"⚠️ 큐빗 수 {n_qubits} > max_fidelity_qubits, 제한: {config.simulator.max_fidelity_qubits}")
-        n_qubits = config.simulator.max_fidelity_qubits
-        
-    # 샷 수 관련 설정 - 표준화된 직접 속성 접근 방식 사용
+    # 설정값 가져오기
     if num_samples is None:
-        num_samples = config.simulator.fidelity_shots
+        num_samples = getattr(config.simulator, "fidelity_shots", 256)
     if num_bins is None:
-        num_bins = getattr(config.simulator, "fidelity_kl_num_bins", 100)  # 직접 속성 접근
-        
-    # 상태벡터 수집
-    states = []
-    for _ in range(num_samples):
-        qc = QuantumCircuitBase().build_qiskit_circuit(circuit_info, n_qubits)
-        qc = transpile(qc, basis_gates=None)
-        state = Statevector.from_instruction(qc)
-        states.append(state.data)
-        
-    # 피델리티 분포 생성
-    pairs = num_samples
+        num_bins = getattr(config.simulator, "fidelity_kl_num_bins", 100)
+    
+    # 피델리티 분포 생성 (같은 회로 구조, 다른 매개변수)
     fidelities = []
-    for _ in range(pairs):
-        i, j = np.random.choice(len(states), size=2, replace=False)
-        fidelity = np.abs(np.sum(np.conj(states[i]) * states[j]))**2
-        fidelities.append(fidelity)
-        
-    # Haar 랜덤 분포 (이론값)
-    haar_fidelities = []
-    haar_n_qubits = n_qubits
-    for _ in range(pairs):
-        fid = np.random.beta(1, 2**haar_n_qubits - 1)
-        haar_fidelities.append(fid)
-        
+    
+    for i in range(num_samples):
+        try:
+            # 두 개의 서로 다른 랜덤 매개변수로 회로 생성
+            qc1 = create_parametrized_circuit_from_info(circuit_info, n_qubits, random_params=True)
+            qc2 = create_parametrized_circuit_from_info(circuit_info, n_qubits, random_params=True)
+            
+            # 상태 계산
+            state1 = Statevector.from_instruction(qc1)
+            state2 = Statevector.from_instruction(qc2)
+            
+            # 피델리티 계산
+            fidelity = state_fidelity(state1, state2)
+            fidelities.append(fidelity)
+            
+        except Exception as e:
+            # 오류가 발생한 샘플은 건너뛰기
+            continue
+    
+    if len(fidelities) < 10:  # 너무 적은 샘플
+        return {
+            "expressibility_value": float('nan'),
+            "method": "statevector_fidelity_kl",
+            "n_qubits": n_qubits,
+            "num_samples": len(fidelities),
+            "error": "Too few valid samples generated"
+        }
+    
     # 히스토그램 구성
     hist_measured, bin_edges = np.histogram(fidelities, bins=num_bins, range=(0, 1), density=True)
-    hist_haar, _ = np.histogram(haar_fidelities, bins=bin_edges, density=True)
-    
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     bin_widths = np.diff(bin_edges)
-    bin_centers = bin_edges[:-1] + bin_widths / 2
     
-    # KL 발산 계산
-    eps = 1e-10
-    kl_div = np.sum(hist_measured * np.log((hist_measured + eps) / (hist_haar + eps)) * bin_widths)
+    # 이론적 Haar 분포 계산
+    haar_theoretical = haar_fidelity_distribution(n_qubits, bin_centers)
+    
+    # KL divergence 계산
+    kl_divergence = calculate_kl_divergence(hist_measured, haar_theoretical, bin_widths)
     
     return {
-        "expressibility_value": float(kl_div),
+        "expressibility_value": float(kl_divergence),
         "method": "statevector_fidelity_kl",
         "n_qubits": n_qubits,
-        "num_samples": num_samples,
+        "num_samples": len(fidelities),
         "num_bins": num_bins,
         "histogram_measured": list(map(float, hist_measured)),
-        "histogram_haar": list(map(float, hist_haar)),
+        "histogram_haar": list(map(float, haar_theoretical)),
         "bin_centers": list(map(float, bin_centers)),
         "fidelities": list(map(float, fidelities)),
     }
