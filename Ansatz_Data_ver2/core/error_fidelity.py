@@ -9,7 +9,7 @@
 from typing import Dict, List, Optional
 import numpy as np
 from execution.executor import ExecutionResult
-from config import default_config
+from config import ExperimentConfig
 
 
 class ErrorFidelityCalculator:
@@ -21,7 +21,7 @@ class ErrorFidelityCalculator:
     """
     
     @staticmethod
-    def calculate_from_counts(counts: Dict[str, int], num_qubits: int) -> float:
+    def calculate_from_counts(counts: Dict[str, int], num_qubits: int, exp_config: ExperimentConfig) -> float:
         """
         측정 결과 카운트로부터 피델리티를 계산합니다.
         
@@ -45,7 +45,7 @@ class ErrorFidelityCalculator:
     
 
         # 전체 샷 수 계산
-        total_shots = default_config.shots
+        total_shots = exp_config.shots
         if total_shots == 0:
             return 0.0
         
@@ -55,7 +55,6 @@ class ErrorFidelityCalculator:
         
         print(counts)
         print(num_qubits)
-        print(counts[zero_state])
         print(counts.get('00000000'))
         print(zero_counts)
         print(total_shots)
@@ -65,7 +64,7 @@ class ErrorFidelityCalculator:
         return float(fidelity)
     
     @staticmethod
-    def calculate_from_execution_result(result: ExecutionResult, num_qubits: int) -> float:
+    def calculate_from_execution_result(result: ExecutionResult, num_qubits: int, exp_config: ExperimentConfig) -> float:
         """
         실행 결과로부터 피델리티를 계산합니다.
         
@@ -79,14 +78,14 @@ class ErrorFidelityCalculator:
         if not result.success:
             return 0.0
         
-        return ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits)
+        return ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits, exp_config)
 
 
-def calculate_error_fidelity(counts: Dict[str, int], num_qubits: int) -> float:
+def calculate_error_fidelity(counts: Dict[str, int], num_qubits: int, exp_config: ExperimentConfig) -> float:
     """피델리티 계산 편의 함수"""
-    return ErrorFidelityCalculator.calculate_from_counts(counts, num_qubits)
+    return ErrorFidelityCalculator.calculate_from_counts(counts, num_qubits, exp_config)
 
 
-def calculate_error_fidelity_from_result(result: ExecutionResult, num_qubits: int) -> float:
+def calculate_error_fidelity_from_result(result: ExecutionResult, num_qubits: int, exp_config: ExperimentConfig) -> float:
     """실행 결과로부터 피델리티 계산 편의 함수"""
-    return ErrorFidelityCalculator.calculate_from_execution_result(result, num_qubits)
+    return ErrorFidelityCalculator.calculate_from_execution_result(result, num_qubits, exp_config)

@@ -2,7 +2,7 @@ from core.circuit_interface import CircuitBuilder, CircuitSpec
 import numpy as np
 from config import ExperimentConfig
 from typing import List, Dict, Any
-from core.gates import gate_registry, GateType
+from core.gates import gate_registry, GateType, GateOperation
 
 def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
     """
@@ -49,7 +49,7 @@ def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
                         parametric_two_qubit_gates.append(gate_name)
                 
                 # 1. 전체 게이트 수 계산 및 게이트 위치 준비
-                total_gates_per_layer = num_qubits  # 각 레이어에서 큐빗 당 평균 1개 게이트
+                total_gates_per_layer = num_qubits + 4  # 각 레이어에서 큐빗 당 평균 1개 게이트
                 total_gates = depth * total_gates_per_layer
                 
                 # 2. 2큐빗 게이트 수 계산 (전체 게이트의 two_qubit_ratio 비율)
@@ -60,7 +60,10 @@ def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
                 gate_positions = []
                 
                 # 레이어별로 게이트 위치 미리 계산
-                for layer in range(depth):
+                for i in range(num_qubits):
+                    gate_positions.append((0, "placeholder"))
+                    
+                for layer in range(1,depth):
                     for _ in range(total_gates_per_layer):
                         gate_positions.append((layer, "placeholder"))
                 
@@ -103,7 +106,7 @@ def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
                         # 단일 큐빗 게이트 적용
                         qubit = np.random.randint(0, num_qubits)
                         # 파라메트릭/비파라메트릭 게이트 중 선택
-                        use_parametric = np.random.random() < 0.5  # 50% 확률로 파라메트릭 게이트 선택
+                        use_parametric = np.random.random() < 0.9  # 50% 확률로 파라메트릭 게이트 선택
                         
                         if use_parametric and parametric_single_gates:
                             gate_name = np.random.choice(parametric_single_gates)
@@ -116,3 +119,41 @@ def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
                 circuits.append(builder.build_spec())
     
     return circuits
+
+def create_random_parameterized_samples(circuit_spec: CircuitSpec, n: int) -> List[CircuitSpec]:
+    """
+    주어진 회로 사양의 파라미터만 랜덤하게 변경하여 n개의 샘플을 생성합니다.
+    
+    Args:
+        circuit_spec: 파라미터를 랜덤화할 원본 회로 사양
+        n: 생성할 샘플 수
+    
+    Returns:
+        List[CircuitSpec]: 파라미터가 랜덤화된 새 회로 사양 리스트
+    """
+    random_param_circuits = []
+
+    # n개의 샘플 생성
+    for i in range(n):
+        new_gates = []  # 각 샘플마다 gates 리스트 초기화
+        
+        # 각 게이트의 파라미터를 랜덤하게 변경
+        for gate in circuit_spec.gates:
+            if gate.parameters and len(gate.parameters) > 0:
+                # 파라미터가 있는 게이트라면 랜덤 값으로 교체
+                new_params = [np.random.uniform(0, 2 * np.pi) for _ in range(len(gate.parameters))]
+                new_gate = GateOperation(gate.name, gate.qubits, new_params)
+                new_gates.append(new_gate)
+            else:
+                # 파라미터가 없는 게이트는 그대로 유지
+                new_gates.append(gate)
+
+        # 이 샘플에 대한 CircuitSpec 생성
+        new_circuit_spec = CircuitSpec(
+            num_qubits=circuit_spec.num_qubits,
+            gates=new_gates,
+            circuit_id=f"{circuit_spec.circuit_id}_sample_{i}",
+        )
+        random_param_circuits.append(new_circuit_spec)
+    # 수정된 게이트로 새 회로 사양들 반환
+    return random_param_circuits

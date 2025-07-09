@@ -16,8 +16,8 @@ from config import default_config, Config, Exp_Box
 from core.circuit_interface import CircuitBuilder, CircuitSpec
 from core.inverse import create_fidelity_circuit_spec
 from core.error_fidelity import calculate_error_fidelity_from_result
-from core.expressibility.fidelity_divergence import calculate_expressibility_from_results
-from core.expressibility.classical_shadow import calculate_shadow_expressibility_all
+from expressibility.fidelity_divergence import Divergence_Expressibility
+from expressibility.classical_shadow import calculate_shadow_expressibility_all
 from execution.executor import QuantumExecutorFactory
 from execution.simulator_executor import QiskitQuantumCircuit
 from core.random_circuit_generator import generate_random_circuit
@@ -259,7 +259,7 @@ def main():
         # 실험 결과 분석 및 저장
         experiment_results = []
         
-        # 회로별 분석 (각 회로마다 별도로 피델리티/표현력 계산)
+        # 회로별 분석 (각 회로마다 별도로 피델리티/표현력 계산), 여기서 서킷은 스펙객체임임
         for i, circuit in enumerate(exp1_circuits):
             circuit_results = [result for result in results1 if result.circuit_id == circuit.circuit_id]
             if not circuit_results:
@@ -280,7 +280,7 @@ def main():
                 fidelities = []
                 for result in circuit_results:
                     if result.success and result.counts:
-                        fidelity = calculate_error_fidelity_from_result(result, circuit.num_qubits)
+                        fidelity = calculate_error_fidelity_from_result(result, circuit.num_qubits, exp_box.exp1)
                         fidelities.append(fidelity)
                 
                 # 통계 계산
@@ -295,22 +295,28 @@ def main():
                     }
                 else:
                     circuit_info["fidelity"] = {"error": "No valid fidelity samples"}
+
+                 # 표현력 계산 (시뮬레이터 - 피델리티 다이버전스)
+                expr_result = None
+                try:
+                    expr_result = Divergence_Expressibility.calculate_from_circuit_specs_divergence(circuit)
+                    print("표현력" + "="*50)
+                    print(expr_result)
+                    circuit_info["expressibility_divergence"] = expr_result
+                except Exception as e:
+                    circuit_info["expressibility_divergence"] = {"error": str(e)}
+                    
             except Exception as e:
                 circuit_info["fidelity"] = {"error": str(e)}
             
-            # 표현력 계산 (시뮬레이터 - 피델리티 다이버전스)
-            try:
-                expr_result = calculate_expressibility_from_results(circuit_results, circuit.num_qubits)
-                circuit_info["expressibility_divergence"] = expr_result
-            except Exception as e:
-                circuit_info["expressibility_divergence"] = {"error": str(e)}
-                
+           
             # 클래식 쉐도우 표현력 계산 (IBM)
-            try:
-                shadow_result = calculate_shadow_expressibility_all(circuit_results, circuit.num_qubits)
-                circuit_info["expressibility_shadow"] = shadow_result
-            except Exception as e:
-                circuit_info["expressibility_shadow"] = {"error": str(e)}
+            # shadow_result = None
+            # try:
+            #     shadow_result = calculate_shadow_expressibility_all(circuit_results, circuit.num_qubits)
+            #     circuit_info["expressibility_shadow"] = shadow_result
+            # except Exception as e:
+            #     circuit_info["expressibility_shadow"] = {"error": str(e)}
             
             # 결과 저장
             experiment_results.append(circuit_info)
@@ -318,8 +324,9 @@ def main():
             # 진행 상황 출력
             print(f"회로 {i+1}/{len(exp1_circuits)} 분석 완료")
             print(f"  - 피델리티: {circuit_info['fidelity'].get('mean', 'N/A')}")
-            print(f"  - 표현력(다이버전스): {expr_result.get('expressibility', 'N/A')}")
-            print(f"  - 표현력(쉐도우): {shadow_result['summary'].get('local2_expressibility', 'N/A')}")
+            #print(f"  - 표현력(다이버전스): {circuit_info['expressibility_divergence'].get('expressibility', 'N/A')}")
+            # 클래식 쉐도우 기능이 비활성화되어 있으므로 이 부분 주석 처리
+            # print(f"  - 표현력(쉐도우): {circuit_info.get('expressibility_shadow', {}).get('summary', {}).get('local2_expressibility', 'N/A')}")
         
         # 결과 저장
         output_dir = "output"
@@ -328,7 +335,7 @@ def main():
         output_path = os.path.join(output_dir, "experiment_results.json")
         with open(output_path, 'w') as f:
             json.dump({
-                "experiment_name": exp_box.exp1.name,
+                "experiment_name": exp_box.exp1.exp_name,
                 "experiment_config": {
                     "num_qubits": [int(q) for q in exp_box.exp1.num_qubits],
                     "depth": exp_box.exp1.depth if isinstance(exp_box.exp1.depth, int) else [int(d) for d in exp_box.exp1.depth],
@@ -357,39 +364,15 @@ def main():
         print("=== 실험 요약 ===")
         print(f"총 회로 수: {len(exp1_circuits)}")
         print(f"성공한 회로 수: {len([r for r in experiment_results if 'fidelity' in r and 'error' not in r['fidelity']])}")
-        
-        # 실험 2 실행 준비
-        print(f"\n실험 2 실행 중: {exp_box.exp2.num_qubits} 큐빗, {exp_box.exp2.depth} 깊이...")
-        
-        # 두 번째 실험 실행 - 회로 생성
-        exp2_circuits = generate_random_circuit(exp_box.exp2)
-        print(f"생성된 회로 수: {len(exp2_circuits)}개 ({[q for q in exp_box.exp2.num_qubits]} 큐빗 각각 {exp_box.exp2.num_circuits}개)")
-        
-        # 회로 실행
-        with hardware_executor:
-            results2 = hardware_executor.run(exp2_circuits, exp_box.exp2)
-        print(f"실험 2 완료: {len(results2)} 회로 실행됨")
-        
-        # 여기서도 실험 1과 동일하게 결과 분석 및 저장 가능
-        # (코드 중복을 피하기 위해 실제 구현에서는 함수로 분리하는 것이 좋음)
-        
 
         print(results1)
-        print("="*50)
-        print(results2)
+
 
         for result in results1:
             # 결과 저장 및 표시
             save_results(result, config)
             
             print("\n=== 실험 1 요약 ===")
-        #print_summary(result)
-        
-        for result in results2:
-            # 결과 저장 및 표시
-            save_results(result, config)
-            
-            print("\n=== 실험 2 요약 ===")
         #print_summary(result)
 
     except KeyboardInterrupt:

@@ -42,20 +42,6 @@ from .error_fidelity import (
     calculate_error_fidelity_from_result
 )
 
-from .expressibility.fidelity_divergence import (
-    calculate_expressibility_from_results
-)
-
-from .expressibility.classical_shadow import (
-    calculate_shadow_expressibility_all
-)
-
-# from .expressibility import (
-#     ExpressibilityCalculator,
-#     calculate_expressibility,
-#     calculate_expressibility_from_results
-# )
-
 __all__ = [
     # Circuit interfaces
     'AbstractQuantumCircuit',
@@ -83,7 +69,4 @@ __all__ = [
     
     # Fidelity and Expressibility
     'ErrorFidelityCalculator',
-    'calculate_error_fidelity_from_result',
-    'calculate_expressibility_from_results',
-    'calculate_shadow_expressibility_all'
 ]
