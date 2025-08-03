@@ -1,0 +1,51 @@
+{
+  "model_config": {
+    "d_model": 512,
+    "n_layers": 12,
+    "n_heads": 8,
+    "d_ff": 2048,
+    "max_circuit_length": 256,
+    "max_qubits": 32,
+    "max_grid_size": 128,
+    "dropout": 0.1,
+    "layer_norm_eps": 1e-06,
+    "timesteps": 1000,
+    "noise_schedule": "cosine",
+    "use_flash_attention": true,
+    "use_rotary_pe": true,
+    "use_swiglu": true,
+    "gradient_checkpointing": true
+  },
+  "evaluation": {
+    "num_generated_circuits": 200,
+    "max_generation_length": 128,
+    "guidance_scale": 1.0,
+    "batch_size": 32,
+    "num_workers": 8,
+    "seed": 42
+  },
+  "metrics": {
+    "calculate_expressibility": true,
+    "calculate_entanglement": true,
+    "calculate_fidelity": true,
+    "calculate_gate_diversity": true,
+    "calculate_circuit_depth": true,
+    "calculate_two_qubit_ratio": true
+  },
+  "output": {
+    "save_generated_circuits": true,
+    "save_metrics": true,
+    "save_visualizations": true,
+    "output_dir": "evaluation_results_large",
+    "circuit_output_file": "generated_circuits_large.json",
+    "metrics_output_file": "evaluation_metrics_large.json"
+  },
+  "visualization": {
+    "plot_training_curves": true,
+    "plot_circuit_distributions": true,
+    "plot_property_distributions": true,
+    "save_plots": true,
+    "plot_format": "png",
+    "dpi": 300
+  }
+}

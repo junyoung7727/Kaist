@@ -1,0 +1,87 @@
+{
+  "train_losses": [
+    {
+      "epoch": 0,
+      "loss": 1.7757522265116374
+    },
+    {
+      "epoch": 1,
+      "loss": 1.968530297279358
+    },
+    {
+      "epoch": 2,
+      "loss": 1.4435358047485352
+    },
+    {
+      "epoch": 3,
+      "loss": 1.5881818135579426
+    },
+    {
+      "epoch": 4,
+      "loss": 1.9259663025538127
+    },
+    {
+      "epoch": 5,
+      "loss": 1.6679266293843586
+    },
+    {
+      "epoch": 6,
+      "loss": 1.339581290880839
+    },
+    {
+      "epoch": 7,
+      "loss": 1.2675929069519043
+    },
+    {
+      "epoch": 8,
+      "loss": 1.6138577461242676
+    },
+    {
+      "epoch": 9,
+      "loss": 1.3272021611531575
+    }
+  ],
+  "val_losses": [],
+  "config": {
+    "model_config": {
+      "d_model": 256,
+      "n_layers": 6,
+      "n_heads": 4,
+      "d_ff": 1024,
+      "max_circuit_length": 128,
+      "max_qubits": 16,
+      "max_grid_size": 64,
+      "dropout": 0.1,
+      "layer_norm_eps": 1e-06,
+      "timesteps": 1000,
+      "noise_schedule": "cosine",
+      "use_flash_attention": true,
+      "use_rotary_pe": true,
+      "use_swiglu": true,
+      "gradient_checkpointing": false
+    },
+    "batch_size": 8,
+    "learning_rate": 1e-06,
+    "weight_decay": 0.01,
+    "num_epochs": 10,
+    "warmup_steps": 1000,
+    "max_grad_norm": 1.0,
+    "val_every_n_steps": 500,
+    "save_every_n_steps": 1000,
+    "optimizer": "adamw",
+    "scheduler": "cosine",
+    "use_amp": true,
+    "compile_model": false,
+    "train_data_path": "data/raw/experiment_results.json",
+    "val_data_path": "data/raw/experiment_results.json",
+    "circuit_spec_path": "data/raw/circuit_specs.json",
+    "num_workers": 4,
+    "log_dir": "logs",
+    "save_dir": "checkpoints",
+    "project_name": "quantum_dit",
+    "run_name": null,
+    "gradient_accumulation_steps": 1,
+    "use_ema": true,
+    "ema_decay": 0.9999
+  }
+}

@@ -42,7 +42,7 @@ class SimulatorExecutor(AbstractQuantumExecutor):
             print(f"Simulator initialization failed: {e}")
             return False
 
-    def run(self, circuits: List[CircuitSpec],experiment_config : ExperimentConfig):
+    def run(self, circuits: List[CircuitSpec], exp_config : ExperimentConfig):
         """
         실험 실행
         
@@ -55,12 +55,15 @@ class SimulatorExecutor(AbstractQuantumExecutor):
         
         if isinstance(circuits, CircuitSpec):
             circuits = QiskitQuantumCircuit(circuits).build()
-        elif isinstance(circuits, list):
-            circuits = [QiskitQuantumCircuit(circuit).build() for circuit in circuits]
+            return self.execute_circuit(circuits._qiskit_circuit, exp_config) #단수 복수 차이임
 
-        return self.execute_circuits(circuits, experiment_config)
+        elif isinstance(circuits, list):
+            circuits = [QiskitQuantumCircuit(circuit).build()._qiskit_circuit for circuit in circuits]
+            return self.execute_circuits(circuits, exp_config)
+
+        
     
-    def execute_circuit(self, qiskit_circuit: QiskitQuantumCircuit, exp_config: ExperimentConfig) -> ExecutionResult:
+    def execute_circuit(self, qiskit_circuit: QuantumCircuit, exp_config : ExperimentConfig) -> ExecutionResult:
         """단일 회로 실행"""
         if not self._initialized:
             self.initialize()
@@ -72,8 +75,7 @@ class SimulatorExecutor(AbstractQuantumExecutor):
             qiskit_circuit.add_measurements()
             
             # 회로 트랜스파일
-            transpiled = transpile(qiskit_circuit._qiskit_circuit, self._simulator)
-            
+            transpiled = transpile(qiskit_circuit, self._simulator)
             # 실행
             job = self._simulator.run(transpiled, shots=exp_config.shots)
             result = job.result()
@@ -85,7 +87,7 @@ class SimulatorExecutor(AbstractQuantumExecutor):
                 counts=counts,
                 shots=exp_config.shots,
                 execution_time=execution_time,
-                backend_info=self.get_backend_info(exp_config),
+                backend_info='simulator',
                 circuit_id=qiskit_circuit.name,
                 success=True
             )
@@ -96,18 +98,17 @@ class SimulatorExecutor(AbstractQuantumExecutor):
                 counts={},
                 shots=exp_config.shots,
                 execution_time=execution_time,
-                backend_info=self.get_backend_info(exp_config),
+                backend_info='simulator',
                 circuit_id=qiskit_circuit.name,
                 success=False,
                 error_message=str(e)
             )
     
-    def execute_circuits(self, circuits: List[QiskitQuantumCircuit], exp_config: ExperimentConfig) -> List[ExecutionResult]:
+    def execute_circuits(self, circuits: List[QuantumCircuit], exp_config: ExperimentConfig) -> List[ExecutionResult]:
         """다중 회로 배치 실행"""
         results = []
-        for circuit in circuits:
-            result = self.execute_circuit(circuit, exp_config)
-            results.append(result)
+        result = self.execute_circuit(circuit, exp_config)
+        results.append(result)
         return results
     
     def get_backend_info(self, exp_config: ExperimentConfig) -> Dict[str, Any]:

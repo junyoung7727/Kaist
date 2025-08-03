@@ -19,7 +19,11 @@ from .circuit_interface import (
     gate
 )
 
-from .gates import (
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent / "quantumcommon"))
+
+from gates import (
     QuantumGateRegistry,
     GateDefinition,
     GateType,

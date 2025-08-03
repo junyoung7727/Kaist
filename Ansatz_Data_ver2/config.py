@@ -8,6 +8,10 @@
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 
 @dataclass
@@ -20,6 +24,9 @@ class ExperimentConfig:
     two_qubit_ratio: list[float]
     exp_name: Optional[str] = "Default Name"
     optimization_level: int = 1
+    fidelity_shots: int = 256
+    executor: Optional[Any] = None
+    entangle_shots: int = 256
     
     def __post_init__(self):
         if isinstance(self.num_qubits, int):
@@ -28,13 +35,16 @@ class ExperimentConfig:
 @dataclass
 class Exp_Box:
     exp1 = ExperimentConfig(
-        num_qubits=[4,5,6,7,8],
-        depth=[1,2,4],
+        num_qubits=[50],
+        depth=[5],
         shots=1024,
-        num_circuits=5,
+        num_circuits=1,
         optimization_level=1,
-        two_qubit_ratio=[0.1, 0.5],
-        exp_name="exp1"
+        two_qubit_ratio=[0.1,0.3],
+        exp_name="exp1",
+        fidelity_shots=1024,
+        executor = None,
+        entangle_shots=1024
     )
 
     exp2 = ExperimentConfig(
@@ -44,8 +54,48 @@ class Exp_Box:
         num_circuits=3,
         optimization_level=1,
         two_qubit_ratio=[0.3],
-        exp_name="exp2"
+        exp_name="exp2",
+        fidelity_shots=1024,
+        executor = None,
+        entangle_shots=1024
     )
+
+    statistical_validation_config = ExperimentConfig(
+        num_qubits=[3,5,7,10,13],#7,10,13,15
+        depth=[2,4,6],
+        shots=2048,
+        num_circuits=3,
+        optimization_level=2,
+        two_qubit_ratio=[0.3,0.5],
+        exp_name="statistical_validation_config",
+        fidelity_shots=1024,
+        executor = None,
+        entangle_shots=1024
+    )
+
+    statistical_validation_config1 = ExperimentConfig(
+        num_qubits=[3,5],#7,10,13,15
+        depth=[6],
+        shots=2048,
+        num_circuits=1,
+        optimization_level=2,
+        two_qubit_ratio=[0.3],
+        exp_name="statistical_validation_config123",
+        fidelity_shots=1024,
+        executor = None,
+        entangle_shots=1024
+    )
+
+    def get_setting(self, exp_name='exp1'):
+        """실험 설정을 딕셔너리 형태로 반환
+        
+        Args:
+            exp_name: 실험 설정 이름 (기본값: 'exp1')
+            
+        Returns:
+            실험 설정 딕셔너리
+        """
+        return getattr(self, exp_name)
     
 
 @dataclass
@@ -53,11 +103,10 @@ class Config:
     """애플리케이션 설정"""
     
     # 실행 설정
-    backend_type: str = 'simulator' # 'simulator' 또는 'ibm'
     seed: Optional[int] = None
     
     # 피델리티/표현력 계산 설정
-    min_fidelity_samples: int = 100
+    fidelity_shots: int = 256
     
     # 출력 설정
     output_dir: str = './output'
@@ -73,7 +122,7 @@ class Config:
         """설정 후처리"""
         # 환경변수에서 IBM 토큰 로드
         if not self.ibm_token:
-            self.ibm_token = os.getenv('IBM_QUANTUM_TOKEN')
+            self.ibm_token = os.getenv('IBM_TOKEN')
         
         # 출력 디렉토리 생성
         os.makedirs(self.output_dir, exist_ok=True)
@@ -88,6 +137,7 @@ class Config:
         return {
             'backend_type': self.backend_type,
             'shots': self.shots,
+            'fidelity_shots': self.fidelity_shots,
             'optimization_level': self.optimization_level,
             'seed': self.seed,
             'num_qubits': self.num_qubits,
@@ -98,7 +148,7 @@ class Config:
             'save_circuits': self.save_circuits,
             'save_results': self.save_results,
             'ibm_token': self.ibm_token,
-            'ibm_backend_name': self.ibm_backend_name
+            'ibm_backend_name': os.getenv('IBM_QUANTUM_TOKEN')
         }
 
 

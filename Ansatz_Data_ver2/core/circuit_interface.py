@@ -10,8 +10,11 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
 import numpy as np
-from core.gates import GateOperation
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent / "quantumcommon"))
 
+from gates import GateOperation
 
 @dataclass
 class CircuitSpec:
@@ -19,6 +22,23 @@ class CircuitSpec:
     num_qubits: int
     gates: List[GateOperation]
     circuit_id: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "num_qubits": self.num_qubits,
+            "gates": [g.to_dict() for g in self.gates],
+            "circuit_id": self.circuit_id
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CircuitSpec':
+        """딕셔너리에서 CircuitSpec 객체를 생성"""
+        gates = [GateOperation.from_dict(gate_dict) for gate_dict in data.get("gates", [])]
+        return cls(
+            num_qubits=data.get("num_qubits", 0),
+            gates=gates,
+            circuit_id=data.get("circuit_id", "")
+        )
 
 
 class AbstractQuantumCircuit(ABC):

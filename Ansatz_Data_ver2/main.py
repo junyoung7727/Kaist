@@ -3,160 +3,30 @@
 Quantum Circuit Backend - Main Entry Point
 
 This is the main entry point for the quantum circuit backend system.
-It demonstrates the clean separation between simulator and IBM backends
-using a unified interface.
+It demonstrates the use of the abstract interfaces and implementations.
 """
 
-import json
+# quantum_common 패키지를 찾기 위한 간단한 경로 설정
+import sys
 import os
-from typing import List, Dict, Any
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.dirname(__file__))
+import time
+import json
 import numpy as np
+from typing import List, Dict, Any
+from datetime import datetime
+from utils.result_handler import ResultHandler
+from core.entangle_simulator import meyer_wallace_entropy
+from core.entangle_hardware import meyer_wallace_entropy_swap_test
 
-from config import default_config, Config, Exp_Box
-from core.circuit_interface import CircuitBuilder, CircuitSpec
-from core.inverse import create_fidelity_circuit_spec
-from core.error_fidelity import calculate_error_fidelity_from_result
+from config import default_config, Exp_Box
 from expressibility.fidelity_divergence import Divergence_Expressibility
-from expressibility.classical_shadow import calculate_shadow_expressibility_all
 from execution.executor import QuantumExecutorFactory
-from execution.simulator_executor import QiskitQuantumCircuit
+from core.error_fidelity import run_error_fidelity
 from core.random_circuit_generator import generate_random_circuit
 import numpy as np
 import json
-import os
-
-def run_fidelity_experiment(config: Config) -> Dict[str, Any]:
-    """
-    Run fidelity experiment using the specified backend.
-    
-    This function demonstrates the clean separation:
-    - No backend-specific code here
-    - Backend selection happens only in ExecutorFactory
-    - All circuits use the same abstract interface
-    
-    Args:
-        config: Application configuration
-        
-    Returns:
-        Experiment results
-    """
-    print(f"Starting fidelity experiment with {config.backend_type} backend...")
-    
-    # Create executor (this is the ONLY place where backend type matters)
-    executor = ExecutorFactory.create_executor(config.backend_type)
-    
-    results = {
-        'config': config.to_dict(),
-        'circuits': [],
-        'fidelities': [],
-        'expressibility': None,
-        'backend_info': None
-    }
-    
-    try:
-        with executor:
-            # Get backend info
-            results['backend_info'] = executor.get_backend_info()
-            print(f"Using backend: {results['backend_info']['backend_name']}")
-            
-            # Generate random circuits
-            circuit_specs = []
-            for i in range(config.num_circuits):
-                spec = generate_random_circuit_spec(
-                    config.num_qubits, 
-                    config.circuit_depth, 
-                    f"circuit_{i}"
-                )
-                circuit_specs.append(spec)
-            
-            print(f"Generated {len(circuit_specs)} random circuits")
-            
-            # Create fidelity measurement circuits
-            fidelity_circuits = []
-            for spec in circuit_specs:
-                # Create fidelity circuit (original + inverse)
-                fidelity_spec = create_fidelity_circuit_spec(spec)
-                fidelity_circuit = QiskitQuantumCircuit(fidelity_spec)
-                fidelity_circuits.append(fidelity_circuit)
-            
-            print(f"Created {len(fidelity_circuits)} fidelity measurement circuits")
-            
-            # Execute circuits
-            print("Executing circuits...")
-            execution_results = executor.execute_circuits(fidelity_circuits)
-            
-            # Calculate fidelities
-            fidelities = []
-            for i, (spec, exec_result) in enumerate(zip(circuit_specs, execution_results)):
-                if exec_result.success:
-                    fidelity = calculate_fidelity_from_result(exec_result, config.num_qubits)
-                    fidelities.append(fidelity)
-                    
-                    # Save circuit info
-                    circuit_info = {
-                        'name': spec.name,
-                        'num_qubits': spec.num_qubits,
-                        'num_gates': len(spec.gates),
-                        'fidelity': fidelity,
-                        'execution_time': exec_result.execution_time,
-                        'shots': exec_result.shots
-                    }
-                    results['circuits'].append(circuit_info)
-                    
-                    if i % 10 == 0:
-                        print(f"Processed {i+1}/{len(circuit_specs)} circuits, fidelity: {fidelity:.4f}")
-                else:
-                    print(f"Circuit {i} failed: {exec_result.error_message}")
-            
-            results['fidelities'] = fidelities
-            print(f"Calculated {len(fidelities)} fidelities")
-            
-            # Calculate expressibility
-            if len(fidelities) >= config.min_fidelity_samples:
-                print("Calculating expressibility...")
-                expressibility_result = calculate_expressibility_from_results(
-                    execution_results, config.num_qubits
-                )
-                results['expressibility'] = expressibility_result
-                print(f"Expressibility: {expressibility_result.get('expressibility', 'N/A')}")
-            else:
-                print(f"Insufficient samples for expressibility: {len(fidelities)} < {config.min_fidelity_samples}")
-                results['expressibility'] = {
-                    'error': f'Insufficient samples: {len(fidelities)} < {config.min_fidelity_samples}'
-                }
-    
-    except Exception as e:
-        print(f"Experiment failed: {e}")
-        results['error'] = str(e)
-    
-    return results
-
-
-def save_results(results, config: Config):
-    """
-    Save experiment results to files.
-    
-    Args:
-        results: Experiment results
-        config: Application configuration
-    """
-    if not config.save_results:
-        return
-    
-    # Save main results
-    results_file = os.path.join(config.output_dir, 'experiment_results.json')
-    with open(results_file, 'w') as f:
-        json.dump(results, f, indent=2, default=str)
-    
-    print(f"Results saved to {results_file}")
-    
-    # Save fidelities separately for analysis
-    if results.get('fidelities'):
-        fidelities_file = os.path.join(config.output_dir, 'fidelities.json')
-        with open(fidelities_file, 'w') as f:
-            json.dump(results['fidelities'], f, indent=2)
-        
-        print(f"Fidelities saved to {fidelities_file}")
 
 
 def print_summary(results: List[Dict[str, Any]]):
@@ -183,16 +53,6 @@ def print_summary(results: List[Dict[str, Any]]):
     circuits = results.get('circuits', [])
     print(f"\nCircuits: {len(circuits)}")
     
-    # Fidelity statistics
-    fidelities = results.get('fidelities', [])
-    if fidelities:
-        print(f"\nFidelity Statistics:")
-        print(f"  Count: {len(fidelities)}")
-        print(f"  Mean: {np.mean(fidelities):.4f}")
-        print(f"  Std: {np.std(fidelities):.4f}")
-        print(f"  Min: {np.min(fidelities):.4f}")
-        print(f"  Max: {np.max(fidelities):.4f}")
-    
     # Expressibility
     expressibility = results.get('expressibility')
     if expressibility and not expressibility.get('error'):
@@ -206,21 +66,15 @@ def print_summary(results: List[Dict[str, Any]]):
 
 
 def main():
-    """
-    Main entry point.
-    
-    이 함수는 새로운 API를 활용한 간단하고 직관적인 실행 방식을 보여줍니다:
-    1. 실행자 직접 생성: ExecutorFactory("simulator") 또는 ExecutorFactory("ibm")
-    2. 실험 설정 직접 접근: config.exp1, config.exp2 등
-    3. 간단한 실행: executor.run(config.exp1)
-    4. 명확한 코드 분리와 가독성
-    """
-    print("🚀 Quantum Circuit Backend - 간소화된 API 데모")
-    print("")
     
     # 구성 로드
     config = default_config
-    exp_box = exp_box = Exp_Box()
+    exp_box = Exp_Box()
+    exp_setting = "exp1"
+    exp_config = exp_box.get_setting(exp_setting)
+    fidelity_shots = exp_config.fidelity_shots
+    shots = exp_config.shots
+    
     
     # 사용 가능한 백엔드 표시
     print("사용 가능한 백엔드:")
@@ -228,158 +82,133 @@ def main():
     for i, backend in enumerate(available_backends):
         print(f"  {i+1}. {backend}")
     
-    try:
-        # 백엔드 선택
-        choice = input(f"\n백엔드 선택 (1-{len(available_backends)}) [기본값: 1]: ").strip()
-        backend_type = available_backends[0]  # 기본값: 첫 번째 백엔드
-        if choice:
-            backend_idx = int(choice) - 1
-            if 0 <= backend_idx < len(available_backends):
-                backend_type = available_backends[backend_idx]
-        
-        print(f"선택된 백엔드: {backend_type}")
-        
-        # 실행자 직접 생성 - 새로운 API 사용
-        hardware_executor = QuantumExecutorFactory.create_executor(backend_type)
-        
-        # 실행 컨텍스트
-        print(f"\n실험 1 실행 중: {exp_box.exp1.num_qubits} 큐빗, {exp_box.exp1.depth} 깊이...")
-        
-        # 첫 번째 실험 실행 - 회로 생성
-        exp1_circuits = generate_random_circuit(exp_box.exp1)
-        print(f"생성된 회로 수: {len(exp1_circuits)}개 ({[q for q in exp_box.exp1.num_qubits]} 큐빗 각각 {exp_box.exp1.num_circuits}개)")
-        
 
+    # 백엔드 선택
+    choice = input(f"\n백엔드 선택 (1-{len(available_backends)}) [기본값: 1]: ").strip()
+    backend_type = available_backends[0]  # 기본값: 첫 번째 백엔드
+    if choice:
+        backend_idx = int(choice) - 1
+        if 0 <= backend_idx < len(available_backends):
+            backend_type = available_backends[backend_idx]
+    
+    print(f"선택된 백엔드: {backend_type}")
+    
+    # 실행 컨텍스트
+    print(f"\n실험 1 실행 중: {exp_config.num_qubits} 큐빗, {exp_config.depth} 깊이...")
+    
+    # 첫 번째 실험 실행 - 회로 생성
+    exp_circuits = generate_random_circuit(exp_config)
+    print(f"생성된 회로 수: {len(exp_circuits)}개 ({[q for q in exp_config.num_qubits]} 큐빗 각각 {exp_config.num_circuits}개)")
+    
+    # 실험 결과 분석 및 저장
+    experiment_results = []
 
-        # 회로 실행
-        with hardware_executor:
-            results1 = hardware_executor.run(exp1_circuits, exp_box.exp1)
-        print(f"실험 1 완료: {len(results1)} 회로 실행됨")
+    executor = QuantumExecutorFactory.create_executor(backend_type)
+    exp_config.executor = executor
+    
+    print(f"\n🚀 {backend_type} 백엔드 - 배치 모드 (연결 3번만!)")
+    print(f"생성된 회로 수: {len(exp_circuits)}개")
+    
+    # 배치 처리로 연결 최소화
+    if backend_type == "ibm":
+        print("📊 1/3: 피델리티 배치 측정...")
+        fidelity_result = run_error_fidelity(exp_circuits, exp_config)
         
-        # 실험 결과 분석 및 저장
-        experiment_results = []
+        print("📊 2/3: 표현력 배치 측정...")
+        expr_result = Divergence_Expressibility.calculate_from_circuit_specs_divergence_hardware(
+            exp_circuits, exp_config, num_samples=10
+        )
         
-        # 회로별 분석 (각 회로마다 별도로 피델리티/표현력 계산), 여기서 서킷은 스펙객체임임
-        for i, circuit in enumerate(exp1_circuits):
-            circuit_results = [result for result in results1 if result.circuit_id == circuit.circuit_id]
-            if not circuit_results:
-                print(f"회로 {i+1}의 결과가 없습니다.")
-                continue
-                
-            # 기본 정보 수집
-            circuit_info = {
-                "circuit_id": circuit.circuit_id,
-                "num_qubits": circuit.num_qubits,
-                "gate_count": len(circuit.gates),
-                "two_qubit_ratio": sum(1 for g in circuit.gates if len(g.qubits) > 1) / len(circuit.gates) if circuit.gates else 0
-            }
+        print("📊 3/3: 얽힘도 배치 측정...")
+        from core.entangle_hardware import meyer_wallace_entropy_swap_test
+        entangle_results = meyer_wallace_entropy_swap_test(exp_circuits, exp_config)
+        
+    else:  # simulator
+        print("📊 1/3: 피델리티 배치 측정...")
+        fidelity_results = [run_error_fidelity(circuit, exp_config) for circuit in exp_circuits]
+        
+        print("📊 2/3: 표현력 배치 측정...")
+        expr_results = []
+        for circuit in exp_circuits:
+            result = Divergence_Expressibility.calculate_from_circuit_specs_divergence_simulator(
+                circuit, num_samples=50
+            )
+            expr_results.append(result)
+        
+        print("📊 3/3: 얽힘도 배치 측정...")
+        from core.entangle_simulator import meyer_wallace_entropy
+        entangle_results = [meyer_wallace_entropy(circuit) for circuit in exp_circuits]
+    
+    # 결과 조합
+    for i, circuit in enumerate(exp_circuits):
+        circuit_info = {
+            "circuit_id": circuit.circuit_id,
+            "num_qubits": circuit.num_qubits,
+            "gate_count": len(circuit.gates),
+            "two_qubit_ratio": sum(1 for g in circuit.gates if len(g.qubits) > 1) / len(circuit.gates) if circuit.gates else 0
+        }
+        
+        if backend_type == "ibm":
+            circuit_info["error_fidelity"] = fidelity_result if isinstance(fidelity_result, (int, float)) else 0.0
+            circuit_info["expressibility_divergence"] = expr_result if isinstance(expr_result, (int, float)) else 0.0
+            circuit_info["entanglement_ability"] = entangle_results[i] if i < len(entangle_results) else 0.0
+        else:
+            circuit_info["error_fidelity"] = fidelity_results[i] if i < len(fidelity_results) else 0.0
+            circuit_info["expressibility_divergence"] = expr_results[i] if i < len(expr_results) else 0.0
+            circuit_info["entanglement_ability"] = entangle_results[i] if i < len(entangle_results) else 0.0
+        
+        experiment_results.append(circuit_info)
+        print(f"회로 {i+1}/{len(exp_circuits)} 분석 완료")
+    
+    print(f"\n✅ 배치 처리 완료: 연결 3번으로 {len(exp_circuits)}개 회로 분석!")
+    
+    # 결과 저장 - 새 ResultHandler 사용
+    output_path = ResultHandler.save_experiment_results(
+        experiment_results=experiment_results,
+        exp_config=exp_config,
+        output_dir="output",
+        filename="experiment_results.json"
+    )
+    
+    # CircuitSpec 객체 저장 - 써킷 스펙 리스트 저장
+    circuit_specs_path = ResultHandler.save_circuit_specs(
+        circuit_specs=exp_circuits,  # CircuitSpec 객체 리스트
+        exp_config=exp_config,
+        output_dir="output",
+        filename="circuit_specs.json"
+    )
+    
+    # 파일 생성 확인 및 경로 검증
+    print(f"\n실험 결과 파일 경로: {os.path.abspath(output_path)}")  
+    print(f"써킷 스펙 파일 경로: {os.path.abspath(circuit_specs_path)}")
+    
+    if os.path.exists(output_path):
+        file_size = os.path.getsize(output_path)
+        print(f"파일 생성 성공: {output_path} (크기: {file_size:,} 바이트)")
+        
+        # JSON 파일 유효성 검증
+        try:
+            with open(output_path, 'r') as f:
+                json_data = json.load(f)
+            print(f"JSON 파일 유효성 검증 성공: {len(json_data.get('results', [])):,}개 결과 포함")
             
-            # 피델리티 계산
-            try:
-                # 각 결과의 피델리티 계산
-                fidelities = []
-                for result in circuit_results:
-                    if result.success and result.counts:
-                        fidelity = calculate_error_fidelity_from_result(result, circuit.num_qubits, exp_box.exp1)
-                        fidelities.append(fidelity)
-                
-                # 통계 계산
-                if fidelities:
-                    circuit_info["fidelity"] = {
-                        "mean": float(np.mean(fidelities)),
-                        "std": float(np.std(fidelities)),
-                        "min": float(np.min(fidelities)),
-                        "max": float(np.max(fidelities)),
-                        "values": [float(f) for f in fidelities],
-                        "valid_samples": len(fidelities)
-                    }
-                else:
-                    circuit_info["fidelity"] = {"error": "No valid fidelity samples"}
+            # 결과 요약 정보 표시
+            if 'summary' in json_data and json_data['summary']:
+                print("\n요약 정보:")
+                for key, value in json_data['summary'].items():
+                    print(f"  - {key}: {value}")
+        except json.JSONDecodeError as e:
+            print(f"경고: JSON 파일 형식 오류: {e}")
+        except Exception as e:
+            print(f"경고: 파일 내용 검증 중 오류 발생: {e}")
+    else:
+        print(f"경고: 파일이 생성되지 않았습니다: {output_path}")
+    
+    # 결과 요약 출력
+    print(f"\n결과 요약:")
+    ResultHandler.print_result_summary(experiment_results)
 
-                 # 표현력 계산 (시뮬레이터 - 피델리티 다이버전스)
-                expr_result = None
-                try:
-                    expr_result = Divergence_Expressibility.calculate_from_circuit_specs_divergence(circuit)
-                    print("표현력" + "="*50)
-                    print(expr_result)
-                    circuit_info["expressibility_divergence"] = expr_result
-                except Exception as e:
-                    circuit_info["expressibility_divergence"] = {"error": str(e)}
-                    
-            except Exception as e:
-                circuit_info["fidelity"] = {"error": str(e)}
-            
-           
-            # 클래식 쉐도우 표현력 계산 (IBM)
-            # shadow_result = None
-            # try:
-            #     shadow_result = calculate_shadow_expressibility_all(circuit_results, circuit.num_qubits)
-            #     circuit_info["expressibility_shadow"] = shadow_result
-            # except Exception as e:
-            #     circuit_info["expressibility_shadow"] = {"error": str(e)}
-            
-            # 결과 저장
-            experiment_results.append(circuit_info)
-            
-            # 진행 상황 출력
-            print(f"회로 {i+1}/{len(exp1_circuits)} 분석 완료")
-            print(f"  - 피델리티: {circuit_info['fidelity'].get('mean', 'N/A')}")
-            #print(f"  - 표현력(다이버전스): {circuit_info['expressibility_divergence'].get('expressibility', 'N/A')}")
-            # 클래식 쉐도우 기능이 비활성화되어 있으므로 이 부분 주석 처리
-            # print(f"  - 표현력(쉐도우): {circuit_info.get('expressibility_shadow', {}).get('summary', {}).get('local2_expressibility', 'N/A')}")
-        
-        # 결과 저장
-        output_dir = "output"
-        os.makedirs(output_dir, exist_ok=True)
-        
-        output_path = os.path.join(output_dir, "experiment_results.json")
-        with open(output_path, 'w') as f:
-            json.dump({
-                "experiment_name": exp_box.exp1.exp_name,
-                "experiment_config": {
-                    "num_qubits": [int(q) for q in exp_box.exp1.num_qubits],
-                    "depth": exp_box.exp1.depth if isinstance(exp_box.exp1.depth, int) else [int(d) for d in exp_box.exp1.depth],
-                    "shots": exp_box.exp1.shots,
-                    "num_circuits": exp_box.exp1.num_circuits,
-                    "optimization_level": exp_box.exp1.optimization_level,
-                    "two_qubit_ratio": [float(r) for r in exp_box.exp1.two_qubit_ratio]
-                },
-                "results": experiment_results,
-                "summary": {
-                    "total_circuits": len(exp1_circuits),
-                    "successful_circuits": len([r for r in experiment_results if "fidelity" in r and "error" not in r["fidelity"]]),
-                    "average_fidelity": float(np.mean([r["fidelity"]["mean"] for r in experiment_results 
-                                                if "fidelity" in r and "mean" in r["fidelity"]])) 
-                                                if any("fidelity" in r and "mean" in r["fidelity"] for r in experiment_results) else None,
-                    "average_expressibility_div": float(np.mean([r["expressibility_divergence"]["expressibility"] for r in experiment_results 
-                                                      if "expressibility_divergence" in r and "expressibility" in r["expressibility_divergence"]])) 
-                                                      if any("expressibility_divergence" in r and "expressibility" in r["expressibility_divergence"] for r in experiment_results) else None,
-                    "average_expressibility_shadow": float(np.mean([r["expressibility_shadow"]["summary"]["local2_expressibility"] for r in experiment_results 
-                                                         if "expressibility_shadow" in r and "summary" in r["expressibility_shadow"] and "local2_expressibility" in r["expressibility_shadow"]["summary"]])) 
-                                                         if any("expressibility_shadow" in r and "summary" in r["expressibility_shadow"] and "local2_expressibility" in r["expressibility_shadow"]["summary"] for r in experiment_results) else None
-                }
-            }, f, indent=2)
-        
-        print(f"\n결과 저장 완료: {output_path}")
-        print("=== 실험 요약 ===")
-        print(f"총 회로 수: {len(exp1_circuits)}")
-        print(f"성공한 회로 수: {len([r for r in experiment_results if 'fidelity' in r and 'error' not in r['fidelity']])}")
-
-        print(results1)
-
-
-        for result in results1:
-            # 결과 저장 및 표시
-            save_results(result, config)
-            
-            print("\n=== 실험 1 요약 ===")
-        #print_summary(result)
-
-    except KeyboardInterrupt:
-        print("\n❌ 사용자에 의해 실험이 취소되었습니다")
-    except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
-
+    # 결과 처리가 이미 위에서 완료되었으므로 여기서는 중복 처리 없이 종료
 
 if __name__ == "__main__":
     main()

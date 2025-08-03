@@ -18,6 +18,9 @@ from core.circuit_interface import CircuitSpec
 from core.random_circuit_generator import create_random_parameterized_samples
 from expressibility.statevector_fidelity import StatevectorFidelityCalculator
 from matplotlib import pyplot as plt
+from config import ExperimentConfig
+
+
 
 
 class Divergence_Expressibility:
@@ -91,7 +94,15 @@ class Divergence_Expressibility:
             표현력 계산 결과 딕셔너리
         """
         # 유효한 피델리티 필터링 (0 <= fidelity <= 1)
-        valid_fidelities = [f for f in fidelities if 0.0 <= f <= 1.0 and not np.isnan(f)]
+        # numpy 배열 처리를 위해 안전하게 변환
+        if isinstance(fidelities, np.ndarray):
+            fidelities = fidelities.tolist()
+        
+        valid_fidelities = []
+        for f in fidelities:
+            f_val = float(f)
+            if 0.0 <= f_val <= 1.0 and not np.isnan(f_val):
+                valid_fidelities.append(f_val)
         
         if len(valid_fidelities) < min_samples:
             return {
@@ -108,7 +119,9 @@ class Divergence_Expressibility:
         d = 2 ** num_qubits
         
         def haar_fidelity_cdf(x):
-            """Haar random 상태의 피델리티 누적분포함수"""
+            """Haar random 상태의 피델리틴 누적분포함수"""
+            # scalar 값만 처리 (간단하게)
+            x = float(x)  # 확실히 scalar로 변환
             if x <= 0:
                 return 0.0
             elif x >= 1:
@@ -200,27 +213,38 @@ class Divergence_Expressibility:
                 'error': str(e)
             }
     
-    def plot_overlapping_histograms(circuit_hist, haar_hist, title="Distribution Comparison"):
+    @staticmethod
+    def plot_overlapping_histograms(circuit_hist, haar_hist, title="Distribution Comparison", bins=None):
         """
-        두 히스토그램을 예쁘게 겹쳐서 그리기
-        """
+        미리 계산된 히스토그램 데이터를 시각화
         
-        # 클리핑 (0과 극단값 방지)
-        circuit_hist = np.clip(circuit_hist, 1e-10, 1e10)
-        haar_hist = np.clip(haar_hist, 1e-10, 1e10)
+        Parameters:
+        -----------
+        circuit_hist : array-like
+            회로 분포 히스토그램 데이터 (이미 계산된 빈도)
+        haar_hist : array-like
+            Haar 랜덤 히스토그램 데이터 (이미 계산된 빈도)
+        title : str
+            그래프 제목
+        bins : array-like, optional
+            빈 경계값들. 제공되지 않으면 0과 1 사이에 균등하게 생성됨
+        """
+        # 빈 경계값 설정 (제공되지 않은 경우)
+        if bins is None:
+            bins = np.linspace(0, 1, len(circuit_hist) + 1)
+        
+        # 빈 중앙값 계산 (x축 위치용)
+        bin_centers = 0.5 * (bins[:-1] + bins[1:])
+        bin_width = bins[1] - bins[0]
         
         # 플롯 설정
         plt.figure(figsize=(10, 6))
         
-        # bins 설정 (두 데이터의 범위에 맞춰)
-        all_data = np.concatenate([circuit_hist, haar_hist])
-        bins = np.linspace(np.min(all_data), np.max(all_data), 30)
-        
-        # 히스토그램 겹쳐 그리기
-        plt.hist(circuit_hist, bins=bins, alpha=0.7, density=True, 
+        # 바 차트로 히스토그램 표시 (겹쳐서)
+        plt.bar(bin_centers, circuit_hist, width=bin_width*0.8, alpha=0.7, 
                 color='skyblue', label='Circuit Distribution', edgecolor='navy', linewidth=0.8)
         
-        plt.hist(haar_hist, bins=bins, alpha=0.7, density=True,
+        plt.bar(bin_centers, haar_hist, width=bin_width*0.8, alpha=0.7,
                 color='lightcoral', label='Haar Random Distribution', edgecolor='darkred', linewidth=0.8)
         
         # 스타일링
@@ -230,8 +254,12 @@ class Divergence_Expressibility:
         plt.legend(fontsize=11, frameon=True, fancybox=True, shadow=True)
         plt.grid(True, alpha=0.3, linestyle='--')
         
-        # 축 범위 조정
-        plt.xlim(np.min(all_data) * 0.95, np.max(all_data) * 1.05)
+        # 축 범위 조정 - 피델리티는 0-1 범위
+        plt.xlim(0, 1)
+        
+        # y축도 적절하게 조정
+        max_height = max(np.max(circuit_hist), np.max(haar_hist))
+        plt.ylim(0, max_height * 1.1)  # 최대값보다 10% 더 여유있게
         
         # 배경색 설정
         plt.gca().set_facecolor('#f8f9fa')
@@ -240,7 +268,45 @@ class Divergence_Expressibility:
         plt.show()
 
     @staticmethod
-    def calculate_from_circuit_specs_divergence(circuit_spec: CircuitSpec, 
+    def calculate_from_circuit_specs_divergence_hardware(circuit_spec: CircuitSpec, exp_config: ExperimentConfig, num_samples: int = 50) -> Dict[str, float]:
+        """
+        하드웨어 실행 결과로부터 클래식 쉐도우 기반 표현력 계산
+        
+        Args:
+            circuit_spec: 기본 회로 사양 (파라미터화된 회로)
+            exp_config: 실험 설정
+            num_samples: 생성할 랜덤 파라미터 샘플 수
+            
+        Returns:
+            표현력 계산 결과 딕셔너리
+        """
+        from expressibility.swap_test_fidelity import SwapTestFidelityEstimator
+        
+        try:
+            # IBM 실행자 생성
+            executor = exp_config.executor
+            Swaptest = SwapTestFidelityEstimator(executor, exp_config)
+            # 클래식 쉐도우 기반 페어와이즈 피델리티 계산
+            fidelities = Swaptest.generate_pairwise_fidelities(
+                circuit_spec=circuit_spec,
+                num_samples=num_samples,
+                shots_per_measurement=1024
+            )
+            
+            return Divergence_Expressibility._cal_fidelity_divergence(fidelities, circuit_spec.num_qubits)
+            
+        except Exception as e:
+            return {
+                "expressibility": np.nan,
+                "kl_divergence": np.nan,
+                "js_divergence": np.nan,
+                "wasserstein_distance": np.nan,
+                "total_samples": 0,
+                "error": f"Hardware execution failed: {str(e)}"
+            }
+        
+    @staticmethod
+    def calculate_from_circuit_specs_divergence_simulator(circuit_spec: CircuitSpec, 
                                     num_samples: int = 50) -> Dict[str, float]:
         """
         회로 사양으로부터 표현력을 계산합니다.
@@ -255,17 +321,20 @@ class Divergence_Expressibility:
         Returns:
             표현력 계산 결과 딕셔너리
         """
+        # 랜덤 파라미터화된 회로에서 페어와이즈 피델리티 계산
+        fidelities = StatevectorFidelityCalculator.generate_pairwise_fidelities(
+            circuit_spec, num_samples)
+        return Divergence_Expressibility._cal_fidelity_divergence(fidelities, circuit_spec.num_qubits)
+
+    @staticmethod
+    def _cal_fidelity_divergence(fidelities: List[float], num_qubits: int):
         try:
-            # 랜덤 파라미터화된 회로에서 페어와이즈 피델리티 계산
-            fidelities = StatevectorFidelityCalculator.generate_pairwise_fidelities(
-                circuit_spec, num_samples)
-            
-            # Haar 랜덤 피델리티 생성 (비교용)
+         # Haar 랜덤 피델리티 생성 (비교용)
             num_pairs = len(fidelities)
-            haar_fidelities = Divergence_Expressibility.generate_haar_random_fidelities(circuit_spec.num_qubits, num_pairs)
+            haar_fidelities = Divergence_Expressibility.generate_haar_random_fidelities(num_qubits, num_pairs)
             
             # 히스토그램 계산을 위한 빈(bin) 정의
-            bins = np.linspace(0, 1, 500)
+            bins = np.linspace(0, 1, num_pairs)
             
             # 히스토그램 계산
             circuit_hist, _ = np.histogram(fidelities, bins=bins, density=True)
@@ -279,8 +348,7 @@ class Divergence_Expressibility:
             # 범위 제한 강화 - 너무 큰 값이나 작은 값 방지
             circuit_hist = np.clip(circuit_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
             haar_hist = np.clip(haar_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
-
-            Divergence_Expressibility.plot_overlapping_histograms(circuit_hist, haar_hist)
+            #Divergence_Expressibility.plot_overlapping_histograms(circuit_hist, haar_hist)
             
             try:
                 # KL 다이버전스 계산: KL(circuit || haar) & KL(haar || circuit)
@@ -317,7 +385,6 @@ class Divergence_Expressibility:
                 "js_divergence": js_div,
                 "l2_norm": l2_dist,
                 "valid_samples": len(fidelities),
-                "total_samples": num_samples * (num_samples - 1) // 2
             }
         except Exception as e:
             return {
@@ -326,9 +393,10 @@ class Divergence_Expressibility:
                 "js_divergence": float('nan'),
                 "l2_norm": float('nan'),
                 "valid_samples": 0,
-                "total_samples": num_samples * (num_samples - 1) // 2,
                 "error": str(e)
             }
+        
+           
     
     @staticmethod
     def expressibility_l2_norm(fidelities: List[float], 

@@ -56,7 +56,7 @@ class AbstractQuantumExecutor(ABC):
         return self._config
         
     @abstractmethod
-    def run(self, circuits: List[CircuitSpec],experiment_config : ExperimentConfig):
+    def run(self, circuits: List[CircuitSpec],exp_config : ExperimentConfig):
         """간단한 실험 실행 메서드
         
         Args:

@@ -7,9 +7,12 @@
 """
 
 from typing import List
-from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec, GateOperation, CircuitBuilder
-from core.gates import gate_registry
+from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec, CircuitBuilder
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent.parent / "quantumcommon"))
+from gates import GateOperation, gate_registry
 
 class InverseCircuitGenerator:
     """
@@ -40,11 +43,11 @@ class InverseCircuitGenerator:
             inverse_gates.append(inverse_gate)
         
         # 역회로 사양 생성
-        inverse_name = f"inverse_{original_spec.name}" if original_spec.name else None
+        inverse_id = f"inverse_{original_spec.circuit_id}" if original_spec.circuit_id else None
         return CircuitSpec(
             num_qubits=original_spec.num_qubits,
-            gates=inverse_gates,
-            name=inverse_name
+            gates=original_spec.gates + inverse_gates,
+            circuit_id=inverse_id
         )
     
     @staticmethod
@@ -90,7 +93,7 @@ class InverseCircuitGenerator:
         """
         builder = CircuitBuilder()
         builder.set_qubits(original_spec.num_qubits)
-        builder.set_name(f"fidelity_{original_spec.name}")
+        builder.set_circuit_id(f"fidelity_{original_spec.circuit_id}")
         
         # 1. 모든 큐빗을 |0⟩ 상태로 초기화 (Reset 게이트)
         for qubit in range(original_spec.num_qubits):

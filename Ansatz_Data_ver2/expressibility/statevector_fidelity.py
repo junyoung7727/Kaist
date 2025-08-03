@@ -41,7 +41,6 @@ class StatevectorFidelityCalculator:
             # 상태벡터 시뮬레이터로 실행
             qc = qiskit_circuit._qiskit_circuit
             statevector = Statevector(qc)
-            print(statevector)
             #qc.draw('mpl')
             #plt.show()
             
@@ -50,8 +49,6 @@ class StatevectorFidelityCalculator:
             print(f"Statevector 계산 중 오류 발생: {e}")
             return None
         
-    
-    
     @staticmethod
     def calculate_pairwise_fidelity(state1: np.ndarray, state2: np.ndarray) -> float:
         """
@@ -96,7 +93,7 @@ class StatevectorFidelityCalculator:
                     statevectors[i], statevectors[j]
                 )
                 fidelities.append(fidelity)
-                print(f"Fidelity between sample {i} and {j}: {fidelity}")
+                #print(f"Fidelity between sample {i} and {j}: {fidelity}")
         if fidelities.count(1.0) > 1:
             print(circuit_spec.circuit_id)
             QiskitQuantumCircuit(circuit_spec).build().qiskit_circuit.draw('mpl')

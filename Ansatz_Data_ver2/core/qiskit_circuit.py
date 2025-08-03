@@ -1,6 +1,9 @@
 from qiskit import QuantumCircuit
-from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec, GateOperation
-from core.gates import GateType, GateOperation, gate_registry, get_gate_operation_info
+from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec
+from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent.parent / "quantumcommon"))
+from gates import GateType, GateOperation, gate_registry
 from qiskit.circuit import ClassicalRegister
 from typing import Dict, Any, Optional, List  
 
@@ -27,6 +30,22 @@ class QiskitQuantumCircuit(AbstractQuantumCircuit):
         
         self._built = True
         return self
+
+    @staticmethod
+    def from_qiskit_circuit(qiskit_circuit: QuantumCircuit) -> 'QiskitQuantumCircuit':
+        """Qiskit 회로를 QiskitQuantumCircuit으로 변환"""
+        # 빈 CircuitSpec으로 인스턴스 생성
+        empty_spec = CircuitSpec(
+            num_qubits=qiskit_circuit.num_qubits,
+            gates=[],
+            circuit_id=qiskit_circuit.name or "imported_circuit"
+        )
+        
+        # QiskitQuantumCircuit 인스턴스 생성
+        wrapper = QiskitQuantumCircuit(empty_spec)
+        wrapper._qiskit_circuit = qiskit_circuit
+        wrapper._built = True
+        return wrapper
     
     def _add_gate(self, gate: GateOperation) -> 'QiskitQuantumCircuit':
         """Qiskit 회로에 게이트 추가"""
@@ -60,6 +79,9 @@ class QiskitQuantumCircuit(AbstractQuantumCircuit):
         # 파라메트릭 2큐빗 게이트
         elif gate_type == GateType.TWO_QUBIT_PARAMETRIC:
             getattr(self._qiskit_circuit, name)(*params[:num_params], qubits[0], qubits[1])
+        # 3큐빗 게이트
+        elif gate_type == GateType.THREE_QUBIT:
+            getattr(self._qiskit_circuit, name)(qubits[0], qubits[1], qubits[2])
         else:
             raise ValueError(f"Unsupported gate: {name}")
 

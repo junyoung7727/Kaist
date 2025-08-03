@@ -8,13 +8,17 @@ IBM Quantum 서비스를 사용한 양자 회로 실행자입니다.
 
 import time
 from typing import List, Dict, Any, Optional
-from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
+from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.compiler import transpile
+from qiskit import QuantumCircuit
 
 from execution.executor import AbstractQuantumExecutor, ExecutionResult, register_executor
 from config import default_config, ExperimentConfig
 from core.qiskit_circuit import QiskitQuantumCircuit
 from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec
+from qiskit_ibm_runtime import SamplerV2 as Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+
 
 
 @register_executor('ibm')
@@ -37,8 +41,11 @@ class IBMExecutor(AbstractQuantumExecutor):
         """IBM 서비스 초기화"""
         try:
             # IBM Quantum 서비스 초기화
-            self._service = QiskitRuntimeService(token=self._config.ibm_token)
-            
+            self._service = QiskitRuntimeService(
+                channel="ibm_quantum_platform",
+                token=self._config.ibm_token
+            )
+            self.exp_config = exp_config
             # 사용 가능한 백엔드 중 가장 적합한 것 선택
             self._backend = self._service.least_busy(
                 operational=True,
@@ -48,11 +55,9 @@ class IBMExecutor(AbstractQuantumExecutor):
             self._backend_name = self._backend.name
             
             # Sampler 초기화
-            options = Options()
-            options.execution.shots = exp_config.shots
-            options.optimization_level = exp_config.optimization_level
-            
-            self._sampler = Sampler(backend=self._backend, options=options)
+            self.pm = generate_preset_pass_manager(backend=self._backend, optimization_level=1)
+            self._sampler = Sampler(mode=self._backend)
+            self._sampler.options.default_shots = self.exp_config.shots
             
             self._initialized = True
             print(f"IBM backend initialized: {self._backend_name}")
@@ -62,7 +67,7 @@ class IBMExecutor(AbstractQuantumExecutor):
             print(f"IBM initialization failed: {e}")
             return False
 
-    def run(self, circuits: List[CircuitSpec],experiment_config : ExperimentConfig):
+    def run(self, circuits, exp_config : ExperimentConfig):
         """
         실험 실행
         
@@ -75,35 +80,37 @@ class IBMExecutor(AbstractQuantumExecutor):
         
         if isinstance(circuits, CircuitSpec):
             circuits = QiskitQuantumCircuit(circuits).build()
+            # 측정 추가
+            circuits.add_measurements()
+            return self.execute_circuit(circuits._qiskit_circuit, exp_config)
         elif isinstance(circuits, list):
-            circuits = [QiskitQuantumCircuit(circuit).build() for circuit in circuits]
-
-        return self.execute_circuits(circuits, experiment_config)
+            # CircuitSpec 리스트를 QuantumCircuit 리스트로 변환
+            qiskit_circuits = []
+            for circuit_spec in circuits:
+                qc = QiskitQuantumCircuit(circuit_spec).build()
+                qc.add_measurements()
+                qiskit_circuits.append(qc._qiskit_circuit)
+            return self.execute_circuits(qiskit_circuits, exp_config)
     
-    def execute_circuit(self, qiskit_circuit: QiskitQuantumCircuit, exp_config: ExperimentConfig) -> ExecutionResult:
+    def execute_circuit(self, qiskit_circuit: QuantumCircuit, exp_config: ExperimentConfig) -> ExecutionResult:
         """단일 회로 실행"""
         if not self._initialized:
             self.initialize(exp_config)
         
         start_time = time.time()
         
-        try:
-            # 측정 추가
-            qiskit_circuit.add_measurements()
-            
+        try: 
+            original_num_qubits = qiskit_circuit.num_qubits           
             # 백엔드에 맞게 트랜스파일
-            transpiled = transpile(
-                qiskit_circuit._qiskit_circuit, 
-                self._backend,
-                optimization_level=exp_config.optimization_level
-            )
+            transpiled_circuit = self.pm.run(qiskit_circuit)
             
             # IBM Quantum에서 실행
-            job = self._sampler.run([transpiled])
+            job = self._sampler.run([transpiled_circuit])
             result = job.result()
             
             # 결과 처리
-            counts = result[0].data.meas.get_counts()
+            raw_counts = result[0].data.meas.get_counts()
+            counts = self._truncate_counts_to_original_qubits(raw_counts, original_num_qubits)
             
             execution_time = time.time() - start_time
             
@@ -128,59 +135,44 @@ class IBMExecutor(AbstractQuantumExecutor):
                 error_message=str(e)
             )
     
-    def execute_circuits(self, qiskit_circuits: List[QiskitQuantumCircuit], exp_config: ExperimentConfig) -> List[ExecutionResult]:
+    def execute_circuits(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig) -> List[ExecutionResult]:
         """다중 회로 배치 실행"""
         if not self._initialized:
             self.initialize(exp_config)
         
         start_time = time.time()
+
+        # 원래 회로들의 큐빗 수 저장 (트랜스파일 전)
+        original_num_qubits = [circuit.num_qubits for circuit in qiskit_circuits]
+
+        # 백엔드에 맞게 트랜스파일
+        transpiled_circuits = self.pm.run(qiskit_circuits)
         
-        try:
-            # 모든 회로를 Qiskit 회로로 변환
-            qiskit_circuits = []
-            for circuit in qiskit_circuits:
-                circuit.add_measurements()
-                qiskit_circuits.append(circuit.qiskit_circuit)
+        # IBM Quantum에서 실행
+        job = self._sampler.run(transpiled_circuits)
+        results = job.result()
+        
+        # 결과 처리
+        execution_results = []
+        total_time = time.time() - start_time
+        avg_time = total_time / len(qiskit_circuits)
+        
+        for i, result in enumerate(results):
+            raw_counts = result.data.meas.get_counts()
+            # 각 회로의 원래 큐빗 수만큼만 자르기
+            counts = self._truncate_counts_to_original_qubits(raw_counts, original_num_qubits[i])
             
-            # 백엔드에 맞게 트랜스파일
-            transpiled_circuits = transpile(
-                qiskit_circuits,
-                self._backend,
-                optimization_level=self.exp_config.optimization_level
-            )
-            
-            # 배치 실행
-            job = self._sampler.run(transpiled_circuits)
-            results = job.result()
-            
-            # 결과 처리
-            execution_results = []
-            total_time = time.time() - start_time
-            avg_time = total_time / len(qiskit_circuits)
-            
-            for i, result in enumerate(results):
-                counts = result.data.meas.get_counts()
-                
-                execution_results.append(ExecutionResult(
-                    counts=counts,
-                    shots=self.exp_config.shots,
-                    execution_time=avg_time,
-                    backend_info=self.get_backend_info(),
-                    circuit_id=qiskit_circuits[i].name,
-                    success=True
-                ))
-            
-            return execution_results
-            
-        except Exception as e:
-            # 실패 시 개별 실행으로 폴백
-            print(f"Batch execution failed, falling back to individual execution: {e}")
-            results = []
-            for circuit in circuits:
-                result = self.execute_circuit(circuit)
-                results.append(result)
-            return results
-    
+            execution_results.append(ExecutionResult(
+                counts=counts,
+                shots=self.exp_config.shots,
+                execution_time=avg_time,
+                backend_info=self.get_backend_info(),
+                circuit_id=qiskit_circuits[i].name,
+                success=True
+            ))
+        
+        return execution_results
+
     def get_backend_info(self) -> Dict[str, Any]:
         """백엔드 정보 반환"""
         if not self._backend:
@@ -258,3 +250,11 @@ class IBMExecutor(AbstractQuantumExecutor):
         except Exception as e:
             print(f"Failed to set backend {backend_name}: {e}")
             return False
+
+    def _truncate_counts_to_original_qubits(self, counts, original_num_qubits):
+        # 각 회로의 원래 큐빗 수만큼만 자르기
+        truncated_counts = {}
+        for key, value in counts.items():
+            truncated_key = key[:original_num_qubits]
+            truncated_counts[truncated_key] = truncated_counts.get(truncated_key, 0) + value
+        return truncated_counts

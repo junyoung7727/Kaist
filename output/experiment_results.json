@@ -1,0 +1,510 @@
+{
+  "experiment_name": "exp1",
+  "experiment_config": {
+    "num_qubits": [
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "depth": [
+      1,
+      2,
+      4
+    ],
+    "shots": 1024,
+    "num_circuits": 5,
+    "optimization_level": 1,
+    "two_qubit_ratio": [
+      0.1,
+      0.5
+    ]
+  },
+  "results": [
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.2107342620685225,
+        "kl_divergence": 3.745312841795224,
+        "kl_divergence_reverse": 1.8132916717238237,
+        "js_divergence": 0.17600811505934638,
+        "l2_norm": 0.0030504902646774114,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d1_r0.1_4",
+      "num_qubits": 4,
+      "gate_count": 8,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.2303482216374629,
+        "kl_divergence": 3.341253398404201,
+        "kl_divergence_reverse": 0.8361935921752328,
+        "js_divergence": 0.13234255325234714,
+        "l2_norm": 0.0017212837484926848,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d2_r0.1_4",
+      "num_qubits": 4,
+      "gate_count": 16,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.35742721947061856,
+        "kl_divergence": 1.7977723730192925,
+        "kl_divergence_reverse": 1.2568831872661497,
+        "js_divergence": 0.11267781058640167,
+        "l2_norm": 0.0021041266942568005,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d4_r0.1_4",
+      "num_qubits": 4,
+      "gate_count": 32,
+      "two_qubit_ratio": 0.0625
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.1916200230216238,
+        "kl_divergence": 4.2186613080990645,
+        "kl_divergence_reverse": 1.8911590848517064,
+        "js_divergence": 0.19352212506058175,
+        "l2_norm": 0.003382903093801207,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d1_r0.5_4",
+      "num_qubits": 4,
+      "gate_count": 8,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.3857590451773294,
+        "kl_divergence": 1.592291775142461,
+        "kl_divergence_reverse": 1.4431266281986481,
+        "js_divergence": 0.11076944476215408,
+        "l2_norm": 0.0018025511941279885,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d2_r0.5_4",
+      "num_qubits": 4,
+      "gate_count": 16,
+      "two_qubit_ratio": 0.1875
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.4170137463569973,
+        "kl_divergence": 1.3980024848963126,
+        "kl_divergence_reverse": 1.249929352900513,
+        "js_divergence": 0.08461034892555427,
+        "l2_norm": 0.0011511541552846705,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_4q_d4_r0.5_4",
+      "num_qubits": 4,
+      "gate_count": 32,
+      "two_qubit_ratio": 0.40625
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.08895047253297936,
+        "kl_divergence": 10.242211216238779,
+        "kl_divergence_reverse": 1.6608327015739728,
+        "js_divergence": 0.3471619779761663,
+        "l2_norm": 0.0028458780394431346,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d1_r0.1_4",
+      "num_qubits": 5,
+      "gate_count": 9,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.26975009483629625,
+        "kl_divergence": 2.7071349339353223,
+        "kl_divergence_reverse": 0.5606838782752294,
+        "js_divergence": 0.11027916539555963,
+        "l2_norm": 0.0022622319305116282,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d2_r0.1_4",
+      "num_qubits": 5,
+      "gate_count": 18,
+      "two_qubit_ratio": 0.05555555555555555
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.46935729090305756,
+        "kl_divergence": 1.1305730610383615,
+        "kl_divergence_reverse": 0.5354474349236531,
+        "js_divergence": 0.07547617130834006,
+        "l2_norm": 0.003303926601138607,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d4_r0.1_4",
+      "num_qubits": 5,
+      "gate_count": 36,
+      "two_qubit_ratio": 0.08333333333333333
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.2477237858945018,
+        "kl_divergence": 3.0367540661834966,
+        "kl_divergence_reverse": 1.2943713307511424,
+        "js_divergence": 0.17890994593144766,
+        "l2_norm": 0.006342838702978855,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d1_r0.5_4",
+      "num_qubits": 5,
+      "gate_count": 9,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.35512155863710015,
+        "kl_divergence": 1.8159371789137226,
+        "kl_divergence_reverse": 1.224868923127058,
+        "js_divergence": 0.14841649735286477,
+        "l2_norm": 0.0064028961480678435,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d2_r0.5_4",
+      "num_qubits": 5,
+      "gate_count": 18,
+      "two_qubit_ratio": 0.16666666666666666
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.45240875427926985,
+        "kl_divergence": 1.210390472202721,
+        "kl_divergence_reverse": 0.8828152265187902,
+        "js_divergence": 0.10553064540044539,
+        "l2_norm": 0.004655531731012228,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_5q_d4_r0.5_4",
+      "num_qubits": 5,
+      "gate_count": 36,
+      "two_qubit_ratio": 0.3611111111111111
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.20799579703574642,
+        "kl_divergence": 3.807789456573196,
+        "kl_divergence_reverse": 0.7981877068982304,
+        "js_divergence": 0.17879319962530157,
+        "l2_norm": 0.006737017635858167,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d1_r0.1_4",
+      "num_qubits": 6,
+      "gate_count": 10,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.19504982344632305,
+        "kl_divergence": 4.12689518160572,
+        "kl_divergence_reverse": 0.45717487588056605,
+        "js_divergence": 0.13387354372667382,
+        "l2_norm": 0.0024088572196414486,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d2_r0.1_4",
+      "num_qubits": 6,
+      "gate_count": 20,
+      "two_qubit_ratio": 0.1
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.438728702379949,
+        "kl_divergence": 1.2793129206622484,
+        "kl_divergence_reverse": 0.7273973708184512,
+        "js_divergence": 0.11282448052901012,
+        "l2_norm": 0.0069036924277732,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d4_r0.1_4",
+      "num_qubits": 6,
+      "gate_count": 40,
+      "two_qubit_ratio": 0.05
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.19465640724781322,
+        "kl_divergence": 4.137257047629158,
+        "kl_divergence_reverse": 0.5800584813158783,
+        "js_divergence": 0.1554834886753437,
+        "l2_norm": 0.0041812571663169245,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d1_r0.5_4",
+      "num_qubits": 6,
+      "gate_count": 10,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.33227347794713663,
+        "kl_divergence": 2.00956912413905,
+        "kl_divergence_reverse": 0.7025740598683516,
+        "js_divergence": 0.1560515049471129,
+        "l2_norm": 0.009012574781429104,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d2_r0.5_4",
+      "num_qubits": 6,
+      "gate_count": 20,
+      "two_qubit_ratio": 0.25
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.5661345574308964,
+        "kl_divergence": 0.7663645274331488,
+        "kl_divergence_reverse": 0.49434103923729383,
+        "js_divergence": 0.05707297215916114,
+        "l2_norm": 0.003488441116114501,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_6q_d4_r0.5_4",
+      "num_qubits": 6,
+      "gate_count": 40,
+      "two_qubit_ratio": 0.35
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.16675399577128386,
+        "kl_divergence": 4.996857798667555,
+        "kl_divergence_reverse": 0.6979200888349206,
+        "js_divergence": 0.19055251965852738,
+        "l2_norm": 0.0054554659632442435,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d1_r0.1_4",
+      "num_qubits": 7,
+      "gate_count": 11,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.22472519653811382,
+        "kl_divergence": 3.4498792988279714,
+        "kl_divergence_reverse": 0.5855942698302858,
+        "js_divergence": 0.15823469471657686,
+        "l2_norm": 0.007308377749553044,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d2_r0.1_4",
+      "num_qubits": 7,
+      "gate_count": 22,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.17563989320579082,
+        "kl_divergence": 4.693467365231979,
+        "kl_divergence_reverse": 0.546420668922968,
+        "js_divergence": 0.15843366735964604,
+        "l2_norm": 0.003913851822945547,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d4_r0.1_4",
+      "num_qubits": 7,
+      "gate_count": 44,
+      "two_qubit_ratio": 0.09090909090909091
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.10590505645726965,
+        "kl_divergence": 8.442419780999577,
+        "kl_divergence_reverse": 1.0315088367909053,
+        "js_divergence": 0.2774286195559229,
+        "l2_norm": 0.004529154360859788,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d1_r0.5_4",
+      "num_qubits": 7,
+      "gate_count": 11,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.19623070777367121,
+        "kl_divergence": 4.096042364344836,
+        "kl_divergence_reverse": 0.4608431513104694,
+        "js_divergence": 0.1304810988153959,
+        "l2_norm": 0.003272135043042932,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d2_r0.5_4",
+      "num_qubits": 7,
+      "gate_count": 22,
+      "two_qubit_ratio": 0.36363636363636365
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.39486778921800375,
+        "kl_divergence": 1.5324932225553272,
+        "kl_divergence_reverse": 0.18265999283404566,
+        "js_divergence": 0.05307452604171321,
+        "l2_norm": 0.001819087331217202,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_7q_d4_r0.5_4",
+      "num_qubits": 7,
+      "gate_count": 44,
+      "two_qubit_ratio": 0.38636363636363635
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.0703844980530713,
+        "kl_divergence": 13.207673957495302,
+        "kl_divergence_reverse": 1.8780364262456661,
+        "js_divergence": 0.45513940950288023,
+        "l2_norm": 0.007907146655975377,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d1_r0.1_4",
+      "num_qubits": 8,
+      "gate_count": 12,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.09345540412584324,
+        "kl_divergence": 9.70029078953466,
+        "kl_divergence_reverse": 1.157906861093335,
+        "js_divergence": 0.31027762299354333,
+        "l2_norm": 0.0061865832920785825,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d2_r0.1_4",
+      "num_qubits": 8,
+      "gate_count": 24,
+      "two_qubit_ratio": 0.041666666666666664
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.4508214301745092,
+        "kl_divergence": 1.2181731680610397,
+        "kl_divergence_reverse": 0.5643370811377971,
+        "js_divergence": 0.1376384198499826,
+        "l2_norm": 0.012803411249975685,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d4_r0.1_4",
+      "num_qubits": 8,
+      "gate_count": 48,
+      "two_qubit_ratio": 0.0625
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.059471824022568905,
+        "kl_divergence": 15.814685213295476,
+        "kl_divergence_reverse": 4.769295195565512,
+        "js_divergence": 0.6346439041661852,
+        "l2_norm": 0.009393089045329997,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d1_r0.5_4",
+      "num_qubits": 8,
+      "gate_count": 12,
+      "two_qubit_ratio": 0.0
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.22840097922344144,
+        "kl_divergence": 3.378264941770299,
+        "kl_divergence_reverse": 0.3961246730339092,
+        "js_divergence": 0.11642423670820035,
+        "l2_norm": 0.0038052339606792973,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d2_r0.5_4",
+      "num_qubits": 8,
+      "gate_count": 24,
+      "two_qubit_ratio": 0.2916666666666667
+    },
+    {
+      "simulator_error_fidelity": 1.0,
+      "expressibility_divergence": {
+        "expressibility": 0.622513281192688,
+        "kl_divergence": 0.6063914300496147,
+        "kl_divergence_reverse": 0.223718281379403,
+        "js_divergence": 0.057691405040355734,
+        "l2_norm": 0.007482120069551401,
+        "valid_samples": 1225,
+        "total_samples": 1225
+      },
+      "circuit_id": "exp1_8q_d4_r0.5_4",
+      "num_qubits": 8,
+      "gate_count": 48,
+      "two_qubit_ratio": 0.3125
+    }
+  ],
+  "summary": {
+    "average_expressibility_div": 0.280007443201996,
+    "average_simulator_error_fidelity": 1.0
+  }
+}

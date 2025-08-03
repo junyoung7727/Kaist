@@ -1,6 +1,6 @@
 from .fidelity_divergence import *
 from .statevector_fidelity import *
-from .classical_shadow import *
+from .swap_test_fidelity import *
 
 __all__ = [
     'calculate_experiment_expressibility',
