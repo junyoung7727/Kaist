@@ -107,8 +107,9 @@ class SimulatorExecutor(AbstractQuantumExecutor):
     def execute_circuits(self, circuits: List[QuantumCircuit], exp_config: ExperimentConfig) -> List[ExecutionResult]:
         """다중 회로 배치 실행"""
         results = []
-        result = self.execute_circuit(circuit, exp_config)
-        results.append(result)
+        for circuit in circuits:
+            result = self.execute_circuit(circuit, exp_config)
+            results.append(result)
         return results
     
     def get_backend_info(self, exp_config: ExperimentConfig) -> Dict[str, Any]:

@@ -85,7 +85,7 @@ class RotaryPositionalEmbedding(nn.Module):
         return x + pos_encoding
 
 
-class QuantumCircuitAttentionEmbedding(nn.Module):
+class QuantumCircuitEmbedding(nn.Module):
     """양자 회로를 위한 다층 구조적 어텐션 임베딩 (차원 수정 버전)"""
     
     def __init__(self, 

@@ -6,14 +6,16 @@
 백엔드에 무관하게 작동하며, 실행 결과만을 사용합니다.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 import numpy as np
-from execution.executor import ExecutionResult
 from config import ExperimentConfig
 from core.circuit_interface import CircuitSpec
 from core.inverse import InverseCircuitGenerator
-from execution.executor import QuantumExecutorFactory
 from core.qiskit_circuit import QiskitQuantumCircuit
+
+if TYPE_CHECKING:
+    from execution.executor import ExecutionResult
+
 
 
 class ErrorFidelityCalculator:
@@ -64,7 +66,7 @@ class ErrorFidelityCalculator:
         return float(fidelity)
     
     @staticmethod
-    def calculate_from_execution_result(result: ExecutionResult, num_qubits: int, shots: int) -> float:
+    def calculate_from_execution_result(result: 'ExecutionResult', num_qubits: int, shots: int) -> float:
         """
         실행 결과로부터 피델리티를 계산합니다.
         
@@ -80,35 +82,68 @@ class ErrorFidelityCalculator:
         
         return ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits, shots)
 
-def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentConfig) -> float:
+def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentConfig, batch_manager=None) -> Union[float, List[int]]:
     """
     피델리티 계산을 위한 실행 함수
     
     Args:
-        circuit_spec: 회로 사양
+        circuit_specs: 회로 사양 리스트
         exp_config: 실험 설정
-        executor: 실행자
+        batch_manager: 배치 관리자 (None이면 기존 모드)
         
     Returns:
-        피델리티 값 (0.0 ~ 1.0)
+        배치 모드: 배치 인덱스 리스트
+        기존 모드: 피델리티 값
     """
-    inverse = []
+    from typing import Union
+    
+    # 역회로 생성
+    inverse_circuits = []
+    qiskit_circuits = []
+    
     for circuit_spec in circuit_specs:
+        # 역회로 스펙 생성
         inverse_circuit_spec = InverseCircuitGenerator.create_inverse_spec(circuit_spec)
-        inverse.append(inverse_circuit_spec)
+        inverse_circuits.append(inverse_circuit_spec)
         
-    result = exp_config.executor.run(inverse, exp_config)
-
-    if not result.success:
-        raise ValueError("Execution failed")
+        # Qiskit 회로로 변환
+        qiskit_circuit = QiskitQuantumCircuit(inverse_circuit_spec)
+        qiskit_circuit.build() 
         
-    return calculate_error_fidelity(result.counts, circuit_spec.num_qubits, exp_config.shots)
-
+        # 측정 추가
+        qiskit_circuit.add_measurements()
+        qiskit_circuits.append(qiskit_circuit.qiskit_circuit)
+    
+    if batch_manager:
+        # 배치 모드: 회로만 수집
+        metadata = {
+            "task": "fidelity",
+            "circuit_count": len(circuit_specs)
+        }
+        indices = batch_manager.collect_task_circuits(
+            "fidelity", qiskit_circuits, circuit_specs, metadata
+        )
+        return indices
+    else:
+        executor = exp_config.executor
+        results = executor.execute_circuits(qiskit_circuits)
+        
+        # 피델리티 계산
+        fidelities = []
+        for result, circuit_spec in zip(results, circuit_specs):
+            fidelity = ErrorFidelityCalculator.calculate_from_execution_result(
+                result, circuit_spec.num_qubits, exp_config.shots
+            )
+            fidelities.append(fidelity)
+        
+        # 평균 피델리티 반환 (기존 동작 유지)
+        return sum(fidelities) / len(fidelities) if fidelities else 0.0
+    
 def calculate_error_fidelity(counts: Dict[str, int], num_qubits: int, shots: int) -> float:
     """피델리티 계산 편의 함수"""
     return ErrorFidelityCalculator.calculate_from_counts(counts, num_qubits, shots)
 
 
-def calculate_error_fidelity_from_result(result: ExecutionResult, num_qubits: int, shots: int) -> float:
+def calculate_error_fidelity_from_result(result: 'ExecutionResult', num_qubits: int, shots: int) -> float:
     """실행 결과로부터 피델리티 계산 편의 함수"""
     return ErrorFidelityCalculator.calculate_from_execution_result(result, num_qubits, shots)

@@ -1,0 +1,410 @@
+{
+  "experiment_name": "exp1",
+  "circuits": {
+    "exp1_3q_d5_r0.1_0": {
+      "circuit_id": "exp1_3q_d5_r0.1_0",
+      "num_qubits": 3,
+      "gates": [
+        {
+          "name": "ry",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            5.756619905354404
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            0.05468531249990738
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            3.7649361920091042
+          ]
+        },
+        {
+          "name": "h",
+          "qubits": [
+            1
+          ],
+          "parameters": []
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.7607529058872549
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            5.164884674534696
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            0.18561281178375613
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            3.6915036839101494
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            4.710283609438151
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.1072751390104516
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            0.4329499340468018
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.1466325107185518
+          ]
+        },
+        {
+          "name": "y",
+          "qubits": [
+            0
+          ],
+          "parameters": []
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            5.804633672865588
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.5434287628537449
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            4.199960822141244
+          ]
+        },
+        {
+          "name": "cry",
+          "qubits": [
+            1,
+            2
+          ],
+          "parameters": [
+            3.1339833565312722
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            1.1805626791924198
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            6.209718801567243
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.5694852650723723
+          ]
+        }
+      ],
+      "qasm": null
+    },
+    "exp1_3q_d5_r0.3_0": {
+      "circuit_id": "exp1_3q_d5_r0.3_0",
+      "num_qubits": 3,
+      "gates": [
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            1.63682386380615
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.8084006595554745
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            0.9525792163602955
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            2.267363577460397
+          ]
+        },
+        {
+          "name": "cry",
+          "qubits": [
+            0,
+            1
+          ],
+          "parameters": [
+            5.684696646459034
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            5.209199822276037
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.421334889902627
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.0695086517312258
+          ]
+        },
+        {
+          "name": "y",
+          "qubits": [
+            0
+          ],
+          "parameters": []
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            4.73691003637008
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            2.5540634602694445
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            5.304901697406222
+          ]
+        },
+        {
+          "name": "crx",
+          "qubits": [
+            0,
+            2
+          ],
+          "parameters": [
+            3.1654235706105136
+          ]
+        },
+        {
+          "name": "crz",
+          "qubits": [
+            0,
+            2
+          ],
+          "parameters": [
+            4.844720895487052
+          ]
+        },
+        {
+          "name": "cx",
+          "qubits": [
+            2,
+            1
+          ],
+          "parameters": []
+        },
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            2.8057738242839014
+          ]
+        },
+        {
+          "name": "cry",
+          "qubits": [
+            0,
+            1
+          ],
+          "parameters": [
+            2.793178221588369
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            1.7460432490819606
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            5.939457180324049
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.0154554787207104
+          ]
+        }
+      ],
+      "qasm": null
+    }
+  },
+  "results": {
+    "exp1_3q_d5_r0.1_0": {
+      "circuit_id": "exp1_3q_d5_r0.1_0",
+      "num_qubits": 3,
+      "depth": 20,
+      "timestamp": "2025-08-04T16:30:13.701523",
+      "fidelity": 1.0,
+      "robust_fidelity": 1.0,
+      "expressibility": {
+        "kl_divergence": 0.0
+      },
+      "entanglement": 0.15755208333333326
+    },
+    "exp1_3q_d5_r0.3_0": {
+      "circuit_id": "exp1_3q_d5_r0.3_0",
+      "num_qubits": 3,
+      "depth": 20,
+      "timestamp": "2025-08-04T16:30:13.701523",
+      "fidelity": 1.0,
+      "robust_fidelity": 1.0,
+      "expressibility": {
+        "kl_divergence": 0.0
+      },
+      "entanglement": 0.6002604166666667
+    }
+  },
+  "summary": {
+    "total_results": 2,
+    "total_circuits": 2,
+    "matched_pairs": 2,
+    "results_without_circuits": 0,
+    "circuits_without_results": 0
+  }
+}

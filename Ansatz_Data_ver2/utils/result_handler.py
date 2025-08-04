@@ -233,6 +233,101 @@ class ResultHandler:
         return output_path
 
     @staticmethod
+    def save_experiment_results_with_circuits(experiment_results: List[Dict[str, Any]], 
+                                            circuit_specs: List[CircuitSpec],
+                                            exp_config: Any, 
+                                            output_dir: str = "output",
+                                            filename: str = "experiment_results_with_circuits.json") -> str:
+        """
+        Save experiment results with matching circuit information to a JSON file.
+        
+        Args:
+            experiment_results: List of experiment results
+            circuit_specs: List of CircuitSpec objects
+            exp_config: Experiment configuration
+            output_dir: Output directory
+            filename: Output filename
+            
+        Returns:
+            Path to the saved file
+        """
+        # Create the output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create a mapping from circuit_id to circuit_spec
+        circuit_map = {spec.circuit_id: spec for spec in circuit_specs}
+        
+        # Separate circuits and results dictionaries
+        circuits_dict = {}
+        results_dict = {}
+        
+        for result in experiment_results:
+            try:
+                formatted_result = ResultHandler.format_circuit_info(result)
+                circuit_id = formatted_result.get('circuit_id')
+                
+                if not circuit_id:
+                    print(f"Warning: Result without circuit_id found, skipping")
+                    continue
+                
+                # Store result data (without circuit info)
+                results_dict[circuit_id] = formatted_result
+                
+                # Store circuit information separately if found
+                if circuit_id in circuit_map:
+                    circuit_spec = circuit_map[circuit_id]
+                    circuits_dict[circuit_id] = {
+                        'circuit_id': circuit_spec.circuit_id,
+                        'num_qubits': circuit_spec.num_qubits,
+                        'gates': [{
+                            'name': gate.name,
+                            'qubits': gate.qubits,
+                            'parameters': gate.parameters
+                        } for gate in circuit_spec.gates],
+                        'qasm': circuit_spec.to_qasm() if hasattr(circuit_spec, 'to_qasm') else None
+                    }
+                
+            except Exception as e:
+                print(f"Warning: Failed to format circuit result: {e}")
+                # Still try to store with error info
+                circuit_id = ResultHandler.safe_get(result, "circuit_id", f"error_{len(results_dict)}")
+                results_dict[circuit_id] = {
+                    "circuit_id": circuit_id,
+                    "error": f"Failed to format: {str(e)}"
+                }
+        
+        # Calculate summary statistics
+        summary = {
+            'total_results': len(results_dict),
+            'total_circuits': len(circuits_dict),
+            'matched_pairs': len(set(results_dict.keys()) & set(circuits_dict.keys())),
+            'results_without_circuits': len(set(results_dict.keys()) - set(circuits_dict.keys())),
+            'circuits_without_results': len(set(circuits_dict.keys()) - set(results_dict.keys()))
+        }
+        
+        # Create the final data structure with separated top-level objects
+        data = {
+            "experiment_name": getattr(exp_config, 'exp_name', 'unknown'),
+            "circuits": circuits_dict,
+            "results": results_dict,
+            "summary": summary
+        }
+        
+        # Save to file
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, cls=CustomJSONEncoder)
+        
+        print(f"💾 Results with circuits saved to: {filepath}")
+        print(f"   - Total results: {summary['total_results']}")
+        print(f"   - Total circuits: {summary['total_circuits']}")
+        print(f"   - Matched pairs: {summary['matched_pairs']}")
+        print(f"   - Results without circuits: {summary['results_without_circuits']}")
+        print(f"   - Circuits without results: {summary['circuits_without_results']}")
+        
+        return filepath
+
+    @staticmethod
     def save_circuit_specs(circuit_specs: List[CircuitSpec], exp_config: Any, output_dir: str = "output", 
                           filename: str = "circuit_specs.json") -> str:
         """

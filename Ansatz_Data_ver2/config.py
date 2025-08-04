@@ -27,6 +27,7 @@ class ExperimentConfig:
     fidelity_shots: int = 256
     executor: Optional[Any] = None
     entangle_shots: int = 256
+    num_samples: int = 10
     
     def __post_init__(self):
         if isinstance(self.num_qubits, int):
@@ -34,8 +35,24 @@ class ExperimentConfig:
 
 @dataclass
 class Exp_Box:
+    # IBM Quantum 1회 제출량 1천만 샷 제한 내 최적화된 실험 설계
+    scalability_test = ExperimentConfig(
+        num_qubits=[3, 5, 7, 10, 20, 30, 40, 50],  # 12개 큐빗 수준
+        depth=[1, 2, 3, 5],  # 2개 깊이 (너무 많으면 샷 수 폭증)
+        shots=512,     # 표현력 측정용 (감소)
+        num_circuits=1,  # 회로 수 최소화
+        optimization_level=3,
+        two_qubit_ratio=[0.3, 0.5, 0.8],  # 1개 비율만 (다양성 줄임)
+        exp_name="scalability_test",
+        fidelity_shots=512,    # 피델리티 측정용
+        executor=None,
+        entangle_shots=512,    #얽힘도 측정용
+        num_samples=7          # 표현력 샘플 수 최소화 (2개면 1개 페어)
+    )
+    
+    # 샷 수 계산 검증용 설정
     exp1 = ExperimentConfig(
-        num_qubits=[50],
+        num_qubits=[3],
         depth=[5],
         shots=1024,
         num_circuits=1,
@@ -44,7 +61,8 @@ class Exp_Box:
         exp_name="exp1",
         fidelity_shots=1024,
         executor = None,
-        entangle_shots=1024
+        entangle_shots=1024,
+        num_samples = 3
     )
 
     exp2 = ExperimentConfig(
@@ -57,20 +75,22 @@ class Exp_Box:
         exp_name="exp2",
         fidelity_shots=1024,
         executor = None,
-        entangle_shots=1024
+        entangle_shots=1024,
+        num_samples = 10
     )
 
     statistical_validation_config = ExperimentConfig(
-        num_qubits=[3,5,7,10,13],#7,10,13,15
-        depth=[2,4,6],
+        num_qubits=[3,5,7,10],#7,10,13,15
+        depth=[2,4,6,8],
         shots=2048,
         num_circuits=3,
         optimization_level=2,
-        two_qubit_ratio=[0.3,0.5],
+        two_qubit_ratio=[0.2,0.5,0.8],
         exp_name="statistical_validation_config",
         fidelity_shots=1024,
         executor = None,
-        entangle_shots=1024
+        entangle_shots=1024,
+        num_samples = 10
     )
 
     statistical_validation_config1 = ExperimentConfig(
@@ -83,7 +103,8 @@ class Exp_Box:
         exp_name="statistical_validation_config123",
         fidelity_shots=1024,
         executor = None,
-        entangle_shots=1024
+        entangle_shots=1024,
+        num_samples = 10
     )
 
     def get_setting(self, exp_name='exp1'):

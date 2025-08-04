@@ -26,13 +26,7 @@ def meyer_wallace_entropy(circuit: CircuitSpec) -> float:
     """
     qiskit_circuit = QiskitQuantumCircuit(circuit).build()
     qc = qiskit_circuit.qiskit_circuit
-    if qc.num_clbits > 0:
-        qc = qc.remove_final_measurements(inplace=False)
-    qc.save_statevector()
-    gpu_sim = AerSimulator(method='statevector', device='GPU')
-    job = gpu_sim.run(qc)
-    result = job.result()
-    statevector_data = result.get_statevector(experiment=0)
+    statevector_data = Statevector(qc)
     full_rho = DensityMatrix(statevector_data)
     
     sum_purities = 0

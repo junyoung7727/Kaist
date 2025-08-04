@@ -15,9 +15,8 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent / 'quantum_commmon'))
 from gates import GateOperation
 from core.qiskit_circuit import QiskitQuantumCircuit
 from config import ExperimentConfig
-from typing import List
 
-def meyer_wallace_entropy_swap_test(circuits: List[CircuitSpec], exp_config: ExperimentConfig) -> List[float]:
+def meyer_wallace_entropy_swap_test(circuits: Union[CircuitSpec, List[CircuitSpec]], exp_config: ExperimentConfig, batch_manager=None) -> Union[List[float], List[int]]:
     """
     SWAP test 기반 Meyer-Wallach entropy 측정 (배치 모드)
     
@@ -28,24 +27,54 @@ def meyer_wallace_entropy_swap_test(circuits: List[CircuitSpec], exp_config: Exp
     Returns:
         Meyer-Wallach entropy 리스트
     """
-    print(f"🔬 얽힘도 배치 측정: {len(circuits)}개 회로")
     
     num_shots = exp_config.entangle_shots
+
+    if isinstance(circuits, CircuitSpec):
+        circuits = [circuits]
     
-    # 진정한 배치 처리: 모든 회로의 모든 큐빗 SWAP test를 한 번에 실행
-    all_swap_jobs = []
-    circuit_qubit_mapping = []
-    
-    # 1단계: 모든 SWAP test 회로 준비
-    for circuit_idx, circuit in enumerate(circuits):
-        n_qubits = circuit.num_qubits
-        if n_qubits < 2:
-            continue
-            
-        for target_qubit in range(n_qubits):
-            swap_circuit = _create_swap_test_circuit(circuit, target_qubit)
-            all_swap_jobs.append(swap_circuit)
-            circuit_qubit_mapping.append((circuit_idx, target_qubit, n_qubits))
+    if batch_manager:
+        # 배치 모드: 모든 SWAP test 회로 수집
+        all_swap_circuits = []
+        circuit_specs = []
+        circuit_qubit_mapping = []
+        
+        for circuit_idx, circuit in enumerate(circuits):
+            n_qubits = circuit.num_qubits
+            if n_qubits < 2:
+                continue
+                
+            for target_qubit in range(n_qubits):
+                swap_circuit = _create_swap_test_circuit(circuit, target_qubit)
+                all_swap_circuits.append(swap_circuit)
+                circuit_specs.append(circuit)
+                circuit_qubit_mapping.append((circuit_idx, target_qubit, n_qubits))
+        
+        metadata = {
+            "task": "entanglement",
+            "circuit_mapping": circuit_qubit_mapping,
+            "total_circuits": len(circuits)
+        }
+        indices = batch_manager.collect_task_circuits(
+            "entanglement", all_swap_circuits, circuit_specs, metadata
+        )
+        return indices
+    else:
+        # 기존 모드: 직접 실행 (하위 호환성)
+        # 진정한 배치 처리: 모든 회로의 모든 큐빗 SWAP test를 한 번에 실행
+        all_swap_jobs = []
+        circuit_qubit_mapping = []
+        
+        # 1단계: 모든 SWAP test 회로 준비
+        for circuit_idx, circuit in enumerate(circuits):
+            n_qubits = circuit.num_qubits
+            if n_qubits < 2:
+                continue
+                
+            for target_qubit in range(n_qubits):
+                swap_circuit = _create_swap_test_circuit(circuit, target_qubit)
+                all_swap_jobs.append(swap_circuit)
+                circuit_qubit_mapping.append((circuit_idx, target_qubit, n_qubits))
     
     # 2단계: 모든 SWAP test를 한 번에 실행
     print(f"  한 번에 실행할 SWAP test: {len(all_swap_jobs)}개")
@@ -126,7 +155,7 @@ def _create_swap_test_circuit(circuit: CircuitSpec, target_qubit: int):
     return swap_qc
 
 
-def _execute_swap_batch(swap_circuits: List, num_shots: int) -> List[tuple]:
+def _execute_swap_batch(swap_circuits: List, num_shots: int, exp_config: ExperimentConfig) -> List[tuple]:
     """
     모든 SWAP test 회로를 배치로 실행
     
@@ -137,13 +166,7 @@ def _execute_swap_batch(swap_circuits: List, num_shots: int) -> List[tuple]:
     Returns:
         (zero_probability, purity) 튜플 리스트
     """
-    from qiskit_aer import AerSimulator
     
-    simulator = AerSimulator(device='GPU')
-    
-    # 모든 회로를 한 번에 실행
-    job = simulator.run(swap_circuits, shots=num_shots)
-    results = job.result()
     
     batch_results = []
     
@@ -256,7 +279,7 @@ def _swap_test(circuit: CircuitSpec, target_qubit: int, num_shots: int) -> tuple
     swap_qc.measure(ancilla_idx, creg_ancilla[0])
     
     # 시뮬레이터로 실행
-    simulator = AerSimulator(device='GPU')
+    simulator = AerSimulator()
     job = simulator.run(swap_qc, shots=num_shots)
     counts = job.result().get_counts()
     

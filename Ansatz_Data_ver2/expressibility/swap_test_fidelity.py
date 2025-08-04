@@ -16,8 +16,9 @@ SWAP Test는 두 양자 상태 |ψ₁⟩, |ψ₂⟩ 간의 피델리티 F = |⟨
 import numpy as np
 import sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 from dataclasses import dataclass
+from qiskit import QuantumCircuit
 
 # 조건부 임포트 (직접 실행 vs 모듈 임포트)
 try:
@@ -127,12 +128,12 @@ class SwapTestFidelityEstimator:
             qc._qiskit_circuit.measure(ancilla_qubit, creg[0])
             
             # 실행
-            from qiskit_aer import AerSimulator
-            backend = AerSimulator(device='GPU')
-            job = backend.run(qc, shots=shots)
-            result = job.result().get_counts()
+            # from qiskit_aer import AerSimulator
+            # backend = AerSimulator()
+            # job = backend.run(qc, shots=shots)
+            # result = job.result().get_counts()
             
-            #self.executor.execute_circuit(qc, self.exp_config)
+            self.executor.execute_circuit(qc, self.exp_config)
             
             if not result.success:
                 raise RuntimeError(f"SWAP Test execution failed: {result}")
@@ -256,13 +257,7 @@ class SwapTestFidelityEstimator:
             qiskit_circuits.append(qc)
         
         # 배치 실행 - IBMExecutor의 execute_circuits 사용
-        #return self.executor.run(qiskit_circuits, self.exp_config)
-
-        from qiskit_aer import AerSimulator
-        backend = AerSimulator(device='GPU')
-        job = backend.run(qiskit_circuits, shots=shots)
-        result = job.result().get_counts()
-        return result
+        return self.executor.run(qiskit_circuits, self.exp_config)
     
     def _process_swap_result(self, result: ExecutionResult) -> float:
         """단일 SWAP Test 결과를 피델리티로 변환"""
@@ -283,7 +278,7 @@ class SwapTestFidelityEstimator:
         return fidelity
 
     def generate_pairwise_fidelities(self, circuit_spec: CircuitSpec, num_samples: int = 10, 
-                                shots_per_measurement: int = 1024) -> List[float]:
+                            shots_per_measurement: int = 1024, batch_manager=None) -> Union[List[float], List[int]]:
         """
         페어와이즈 피델리티 리스트 계산
         
@@ -291,9 +286,11 @@ class SwapTestFidelityEstimator:
             circuit_spec: 기본 회로 사양
             num_samples: 생성할 샘플 수
             shots_per_measurement: 각 측정당 샷 수
+            batch_manager: 배치 관리자 (선택적)
             
         Returns:
-            List[float]: 페어와이즈 피델리티 리스트
+            List[float]: 페어와이즈 피델리티 리스트 (기본 모드)
+            List[int]: 배치 인덱스 목록 (배치 모드)
         """
         print(f"🔄 Generating Pairwise Fidelities")
         print(f"   Samples: {num_samples}")
@@ -318,13 +315,121 @@ class SwapTestFidelityEstimator:
         print(f"   Collected {len(pairs)} pairs (expected: {total_pairs})")
         print()
         
-        # 배치 피델리티 계산
-        print("🔬 Computing batch fidelities...")
-        fidelities = self.compute_fidelity(pairs, shots_per_measurement=shots_per_measurement)
-        
-        print("✅ Pairwise fidelity computation complete!")
-        return fidelities  # ✅ 페어와이즈 피델리티 리스트 반환
+        if batch_manager:
+            # 배치 모드: SWAP test 회로들을 배치에 추가
+            print("🔬 Preparing SWAP test circuits for batch...")
+            swap_circuits = []
+            circuit_specs = []
+            
+            for i, (circuit1, circuit2) in enumerate(pairs):
+                # SWAP test 회로 생성
+                swap_circuit = self._create_swap_test_circuit(circuit1, circuit2)
+                swap_circuits.append(swap_circuit)
+                circuit_specs.append(circuit_spec)  # 원본 스펙 유지
+            
+            metadata = {
+                "task": "expressibility", 
+                "circuit_id": circuit_spec.circuit_id,
+                "num_pairs": len(pairs),
+                "shots_per_measurement": shots_per_measurement
+            }
+            indices = batch_manager.collect_task_circuits(
+                "expressibility", swap_circuits, circuit_specs, metadata
+            )
+            print(f"   Added {len(swap_circuits)} SWAP test circuits to batch")
+            return indices
+        else:
+            # 기존 모드: 직접 실행
+            print("🔬 Computing batch fidelities...")
+            fidelities = self.compute_fidelity(pairs, shots_per_measurement=shots_per_measurement)
+            
+            print("✅ Pairwise fidelity computation complete!")
+            return fidelities  # ✅ 페어와이즈 피델리티 리스트 반환
 
+    def _create_swap_test_circuit(self, circuit1_spec: CircuitSpec, circuit2_spec: CircuitSpec) -> QuantumCircuit:
+        """
+        두 회로에 대한 SWAP test 회로 생성
+        
+        Args:
+            circuit1_spec: 첫 번째 회로 스펙
+            circuit2_spec: 두 번째 회로 스펙
+            
+        Returns:
+            SWAP test를 위한 Qiskit 회로
+        """
+        from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+        
+        n_qubits = circuit1_spec.num_qubits
+        
+        # 레지스터 생성: 2개 시스템 + 1개 ancilla
+        system1 = QuantumRegister(n_qubits, 'sys1')
+        system2 = QuantumRegister(n_qubits, 'sys2')
+        ancilla = QuantumRegister(1, 'anc')
+        classical = ClassicalRegister(1, 'c')
+        
+        qc = QuantumCircuit(system1, system2, ancilla, classical)
+        
+        # 1. Hadamard on ancilla
+        qc.h(ancilla[0])
+        
+        # 2. 첫 번째 시스템에 circuit1 적용
+        circuit1_qc = QiskitQuantumCircuit(circuit1_spec)
+        circuit1_qc.build()  # build()가 spec의 모든 게이트를 자동으로 추가함
+        qc.compose(circuit1_qc.qiskit_circuit, qubits=system1, inplace=True)
+        
+        # 3. 두 번째 시스템에 circuit2 적용
+        circuit2_qc = QiskitQuantumCircuit(circuit2_spec)
+        circuit2_qc.build()  # build()가 spec의 모든 게이트를 자동으로 추가함
+        qc.compose(circuit2_qc.qiskit_circuit, qubits=system2, inplace=True)
+        
+        # 4. Controlled-SWAP gates
+        for i in range(n_qubits):
+            qc.cswap(ancilla[0], system1[i], system2[i])
+        
+        # 5. Final Hadamard on ancilla
+        qc.h(ancilla[0])
+        
+        # 6. Measure ancilla
+        qc.measure(ancilla[0], classical[0])
+        
+        return qc
+    
+    @staticmethod
+    def _calculate_fidelity_from_swap_result(result) -> float:
+        """
+        SWAP test 결과로부터 피델리티 계산
+        
+        Args:
+            result: SWAP test 실행 결과
+            
+        Returns:
+            피델리티 값
+        """
+        from execution.executor import ExecutionResult
+        
+        if isinstance(result, ExecutionResult):
+            counts = result.counts
+        else:
+            counts = result
+        
+        total_shots = sum(counts.values())
+        if total_shots == 0:
+            return 0.0
+        
+        # ancilla가 0인 확률 계산
+        zero_count = 0
+        for bitstring, count in counts.items():
+            # ancilla는 마지막 큐빗 (가장 오른쪽)
+            if bitstring[-1] == '0':
+                zero_count += count
+        
+        zero_probability = zero_count / total_shots
+        
+        # 피델리티 = 2 * P(0) - 1
+        fidelity = 2 * zero_probability - 1
+        
+        # 피델리티는 0과 1 사이로 클리핑
+        return max(0.0, min(1.0, fidelity))
     
     def theoretical_fidelity(self, circuit1_spec: CircuitSpec, circuit2_spec: CircuitSpec) -> Optional[float]:
         """
@@ -344,8 +449,8 @@ class SwapTestFidelityEstimator:
             # 상태벡터 시뮬레이션 (작은 시스템만)
             from qiskit import Aer, execute
             
-            qc1 = QiskitQuantumCircuit(circuit1_spec).circuit
-            qc2 = QiskitQuantumCircuit(circuit2_spec).circuit
+            qc1 = QiskitQuantumCircuit(circuit1_spec).build().qiskit_circuit
+            qc2 = QiskitQuantumCircuit(circuit2_spec).build().qiskit_circuit
             
             backend = Aer.get_backend('statevector_simulator')
             

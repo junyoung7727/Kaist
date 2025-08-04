@@ -11,7 +11,6 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from core.circuit_interface import AbstractQuantumCircuit
 from config import Config, default_config, ExperimentConfig
-from core.qiskit_circuit import QiskitQuantumCircuit
 from core.circuit_interface import CircuitSpec
 
 

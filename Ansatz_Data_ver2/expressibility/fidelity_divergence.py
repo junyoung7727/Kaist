@@ -7,7 +7,7 @@
 다양한 divergence 측정 방법(KL, JS, L2)을 지원합니다.
 """
 
-from typing import List, Dict, Optional, Tuple, Any 
+from typing import List, Dict, Optional, Tuple, Any, Union 
 import numpy as np
 from scipy.stats import kstest, entropy
 from scipy.spatial.distance import euclidean
@@ -268,7 +268,16 @@ class Divergence_Expressibility:
         plt.show()
 
     @staticmethod
-    def calculate_from_circuit_specs_divergence_hardware(circuit_spec: CircuitSpec, exp_config: ExperimentConfig, num_samples: int = 50) -> Dict[str, float]:
+    def batch_circuit(circuit_specs: List[CircuitSpec], exp_config: ExperimentConfig, num_samples: int = 10, batch_manager=None):
+        qc_idxs = []
+        for circuit_spec in circuit_specs:
+            qc_idx = Divergence_Expressibility.calculate_from_circuit_specs_divergence_hardware(circuit_spec, exp_config, num_samples, batch_manager)
+            qc_idxs.append(qc_idx)
+            print(qc_idx)
+        return qc_idxs
+
+    @staticmethod
+    def calculate_from_circuit_specs_divergence_hardware(circuit_spec: CircuitSpec, exp_config: ExperimentConfig, num_samples: int = 50, batch_manager=None) -> Union[Dict[str, float], List[int]]:
         """
         하드웨어 실행 결과로부터 클래식 쉐도우 기반 표현력 계산
         
@@ -286,14 +295,25 @@ class Divergence_Expressibility:
             # IBM 실행자 생성
             executor = exp_config.executor
             Swaptest = SwapTestFidelityEstimator(executor, exp_config)
-            # 클래식 쉐도우 기반 페어와이즈 피델리티 계산
-            fidelities = Swaptest.generate_pairwise_fidelities(
-                circuit_spec=circuit_spec,
-                num_samples=num_samples,
-                shots_per_measurement=1024
-            )
-            
-            return Divergence_Expressibility._cal_fidelity_divergence(fidelities, circuit_spec.num_qubits)
+            if batch_manager:
+                # 배치 모드: 회로만 수집
+                indices = Swaptest.generate_pairwise_fidelities(
+                    circuit_spec=circuit_spec,
+                    num_samples=num_samples,
+                    shots_per_measurement=1024,
+                    batch_manager=batch_manager
+                )
+                return indices
+            else:
+                # 기존 모드: 직접 실행
+                # 클래식 쉐도우 기반 페어와이즈 피델리티 계산
+                fidelities = Swaptest.generate_pairwise_fidelities(
+                    circuit_spec=circuit_spec,
+                    num_samples=num_samples,
+                    shots_per_measurement=1024
+                )
+                
+                return Divergence_Expressibility._cal_fidelity_divergence(fidelities, circuit_spec.num_qubits)
             
         except Exception as e:
             return {
@@ -333,8 +353,9 @@ class Divergence_Expressibility:
             num_pairs = len(fidelities)
             haar_fidelities = Divergence_Expressibility.generate_haar_random_fidelities(num_qubits, num_pairs)
             
-            # 히스토그램 계산을 위한 빈(bin) 정의
-            bins = np.linspace(0, 1, num_pairs)
+            # 히스토그램 계산을 위한 빈(bin) 정의 - 충분한 해상도 제공
+            num_bins = max(50, min(100, num_pairs * 10))  # 적응적 빈 수, 최소 50개
+            bins = np.linspace(0, 1, num_bins)
             
             # 히스토그램 계산
             circuit_hist, _ = np.histogram(fidelities, bins=bins, density=True)

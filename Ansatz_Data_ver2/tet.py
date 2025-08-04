@@ -1,191 +1,299 @@
-# CUDA-GPU 호환성 상세 진단
-import subprocess
-import sys
-import pkg_resources
+import os
+import json
+from typing import Dict, Any, List, Optional
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit import QuantumCircuit
+from qiskit.result import Result
+import matplotlib.pyplot as plt
+from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
-def check_cuda_versions():
-    """다양한 CUDA 버전 확인"""
-    print("=== CUDA 버전 호환성 확인 ===\n")
+# 환경변수에서 IBM 토큰 가져오기 (또는 직접 입력)
+IBM_TOKEN = os.getenv('IBM_TOKEN') or "YOUR_IBM_TOKEN_HERE"
+
+class IBMJobRetriever:
+    """IBM Quantum job 결과 가져오기 클래스"""
     
-    # 1. nvidia-smi의 CUDA 버전
-    try:
-        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True)
-        if result.returncode == 0:
-            import re
-            cuda_match = re.search(r'CUDA Version: ([\d.]+)', result.stdout)
-            if cuda_match:
-                nvidia_smi_cuda = cuda_match.group(1)
-                print(f"1. nvidia-smi CUDA Version: {nvidia_smi_cuda}")
-    except Exception as e:
-        print(f"1. nvidia-smi 실패: {e}")
+    def __init__(self, token: str = None):
+        """
+        초기화
+        
+        Args:
+            token: IBM Quantum 토큰
+        """
+        self.token = token or IBM_TOKEN
+        self.service = None
+        self.initialize()
     
-    # 2. nvcc 버전 (설치되어 있다면)
-    try:
-        result = subprocess.run(['nvcc', '--version'], capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"2. nvcc 출력:\n{result.stdout}")
-        else:
-            print("2. nvcc 없음 (정상 - WSL2에서는 필수 아님)")
-    except FileNotFoundError:
-        print("2. nvcc 없음 (정상 - WSL2에서는 필수 아님)")
-    
-    # 3. Python CUDA 패키지들
-    print("\n3. Python CUDA 패키지 버전:")
-    cuda_packages = [
-        'nvidia-cuda-runtime-cu11',
-        'nvidia-cublas-cu11', 
-        'nvidia-cusolver-cu11',
-        'nvidia-cusparse-cu11',
-        'cuquantum-cu11'
-    ]
-    
-    for pkg in cuda_packages:
+    def initialize(self):
+        """IBM Quantum 서비스 초기화"""
         try:
-            version = pkg_resources.get_distribution(pkg).version
-            print(f"   {pkg}: {version}")
-        except pkg_resources.DistributionNotFound:
-            print(f"   {pkg}: 설치되지 않음")
-    
-    # 4. qiskit-aer 버전 및 빌드 정보
-    print("\n4. Qiskit Aer 정보:")
-    try:
-        import qiskit_aer
-        print(f"   qiskit-aer 버전: {qiskit_aer.__version__}")
-        
-        # AerSimulator의 빌드 정보 확인
-        from qiskit_aer import AerSimulator
-        sim = AerSimulator()
-        config = sim.configuration()
-        
-        print(f"   Backend 이름: {config.backend_name}")
-        print(f"   Backend 버전: {config.backend_version}")
-        
-        # 사용 가능한 방법들 확인
-        methods = sim.available_methods()
-        devices = sim.available_devices()
-        print(f"   사용 가능한 방법: {methods}")
-        print(f"   사용 가능한 디바이스: {devices}")
-        
-    except Exception as e:
-        print(f"   Qiskit Aer 정보 확인 실패: {e}")
-
-def check_compute_capability_support():
-    """패키지가 지원하는 Compute Capability 확인"""
-    print("\n=== Compute Capability 지원 확인 ===")
-    
-    # GTX 1060은 CC 6.1
-    target_cc = (6, 1)
-    print(f"타겟 GPU: GTX 1060 (CC {target_cc[0]}.{target_cc[1]})")
-    
-    try:
-        # qiskit-aer-gpu 패키지 정보 확인
-        import pkg_resources
-        
-        # 설치된 패키지 목록에서 qiskit-aer 관련 찾기
-        for dist in pkg_resources.working_set:
-            if 'qiskit-aer' in dist.project_name.lower():
-                print(f"\n설치된 패키지: {dist.project_name} {dist.version}")
-                print(f"설치 위치: {dist.location}")
-                
-                # 패키지 메타데이터 확인
-                try:
-                    metadata = dist.get_metadata_lines('METADATA')
-                    for line in metadata:
-                        if 'cuda' in line.lower() or 'compute' in line.lower():
-                            print(f"메타데이터: {line}")
-                except:
-                    pass
-    
-    except Exception as e:
-        print(f"패키지 정보 확인 실패: {e}")
-
-def test_specific_cuda_runtime():
-    """특정 CUDA 런타임 테스트"""
-    print("\n=== CUDA 런타임 호환성 테스트 ===")
-    
-    try:
-        # CUDA 런타임 정보
-        import nvidia.cuda_runtime
-        print("✓ nvidia.cuda_runtime 사용 가능")
-        
-        # 간단한 CUDA 호출 테스트
-        try:
-            # CUDA 디바이스 개수 확인
-            print("CUDA 런타임 테스트 중...")
-            
-            # PyTorch로 CUDA 테스트 (설치되어 있다면)
+            # 먼저 저장된 계정이 있는지 확인
             try:
-                import torch
-                if torch.cuda.is_available():
-                    print(f"✓ PyTorch CUDA 사용 가능")
-                    print(f"  디바이스 개수: {torch.cuda.device_count()}")
-                    print(f"  현재 디바이스: {torch.cuda.current_device()}")
-                    print(f"  디바이스 이름: {torch.cuda.get_device_name()}")
-                    
-                    # 간단한 CUDA 연산 테스트
-                    x = torch.randn(10, device='cuda')
-                    y = x * 2
-                    print("✓ PyTorch CUDA 연산 성공")
-                else:
-                    print("✗ PyTorch CUDA 사용 불가")
-            except ImportError:
-                print("PyTorch 설치되지 않음")
+                self.service = QiskitRuntimeService()
+                print("✅ 저장된 IBM Quantum 계정 사용")
+            except Exception:
+                # 저장된 계정이 없으면 토큰으로 초기화
+                if self.token == "YOUR_IBM_TOKEN_HERE":
+                    print("❌ IBM 토큰이 설정되지 않았습니다.")
+                    print("다음 중 하나를 수행하세요:")
+                    print("1. 환경변수 설정: export IBM_TOKEN='your_token_here'")
+                    print("2. 코드에서 직접 설정: IBM_TOKEN = 'your_token_here'")
+                    print("3. 또는 QiskitRuntimeService.save_account('your_token_here') 실행")
+                    raise ValueError("IBM 토큰이 설정되지 않음")
+                
+                self.service = QiskitRuntimeService(
+                    channel="ibm_quantum_platform",
+                    token=self.token
+                )
+                print("✅ 토큰으로 IBM Quantum 서비스 초기화 완료")
                 
         except Exception as e:
-            print(f"✗ CUDA 런타임 테스트 실패: {e}")
+            print(f"❌ IBM Quantum 서비스 초기화 실패: {e}")
+            print("\n해결 방법:")
+            print("1. IBM Quantum 토큰 확인: https://quantum.ibm.com/")
+            print("2. 계정 저장: QiskitRuntimeService.save_account('your_token')")
+            print("3. 환경변수 설정: export IBM_TOKEN='your_token'")
+            raise
+    
+    def get_job_info(self, job_id: str) -> Dict[str, Any]:
+        """
+        Job 기본 정보 가져오기
+        
+        Args:
+            job_id: IBM Quantum job ID
             
-    except ImportError:
-        print("✗ nvidia.cuda_runtime 없음")
+        Returns:
+            Job 정보 딕셔너리
+        """
+        try:
+            job = self.service.job(job_id)
+            
+            # Job 상태 및 기본 정보
+            info = {
+                'job_id': job_id,
+                'status': job.status().name,
+                'creation_date': str(job.creation_date),
+                'backend': job.backend().name if hasattr(job, 'backend') else 'Unknown',
+                'num_circuits': len(job.circuits()) if hasattr(job, 'circuits') else 'Unknown'
+            }
+            
+            # 추가 메타데이터
+            if hasattr(job, 'tags'):
+                info['tags'] = job.tags()
+            
+            print(f"📋 Job 정보:")
+            for key, value in info.items():
+                print(f"   {key}: {value}")
+                
+            return info
+            
+        except Exception as e:
+            print(f"❌ Job 정보 가져오기 실패: {e}")
+            return {}
+    
+    def get_job_results(self, job_id: str, save_to_file: bool = True) -> Optional[Dict[str, Any]]:
+        """
+        Job 결과 가져오기
+        
+        Args:
+            job_id: IBM Quantum job ID
+            save_to_file: 결과를 파일로 저장할지 여부
+            
+        Returns:
+            Job 결과 딕셔너리
+        """
+        try:
+            job = self.service.job(job_id)
+            
+            # Job 상태 확인
+            status = job.status()
+            print(f"🔍 Job {job_id} 상태: {status.name}")
+            
+            if status.name != 'DONE':
+                print(f"⚠️  Job이 완료되지 않았습니다. 현재 상태: {status.name}")
+                return None
+            
+            # 결과 가져오기
+            print("📥 결과 가져오는 중...")
+            result = job.result()
+            
+            # 결과 정리
+            results_data = {
+                'job_id': job_id,
+                'backend': job.backend().name if hasattr(job, 'backend') else 'Unknown',
+                'creation_date': str(job.creation_date),
+                'num_circuits': len(result.results),
+                'results': []
+            }
+            
+            # 각 회로별 결과 처리
+            for i, circuit_result in enumerate(result.results):
+                circuit_data = {
+                    'circuit_index': i,
+                    'shots': circuit_result.shots,
+                    'success': circuit_result.success,
+                    'counts': circuit_result.data.counts if hasattr(circuit_result.data, 'counts') else None,
+                    'memory': circuit_result.data.memory if hasattr(circuit_result.data, 'memory') else None
+                }
+                results_data['results'].append(circuit_data)
+            
+            print(f"✅ {len(result.results)}개 회로 결과 가져오기 완료")
+            
+            # 파일 저장
+            if save_to_file:
+                filename = f"job_results_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(results_data, f, indent=2, ensure_ascii=False)
+                print(f"💾 결과 저장됨: {filename}")
+            
+            return results_data
+            
+        except Exception as e:
+            print(f"❌ Job 결과 가져오기 실패: {e}")
+            return None
+    
+    def get_job_circuits(self, job_id: str, save_to_file: bool = True) -> Optional[List[QuantumCircuit]]:
+        """
+        Job에서 사용된 회로들 가져오기
+        
+        Args:
+            job_id: IBM Quantum job ID
+            save_to_file: 회로를 파일로 저장할지 여부
+            
+        Returns:
+            QuantumCircuit 리스트
+        """
+        try:
+            print(f"🔄 Job {job_id} 정보 가져오는 중... (대용량 job의 경우 시간이 걸릴 수 있습니다)")
+            job = self.service.job(job_id)
+            print("✅ Job 정보 가져오기 완료")
+            
+            # 회로 가져오기
+            if hasattr(job, 'circuits'):
+                circuits = job.circuits()
+                print(f"🔧 {len(circuits)}개 회로 가져오기 완료")
+                
+                # 파일 저장 (96개만)
+                if save_to_file:
+                    # 96개 회로만 선택
+                    circuits_to_save = circuits[:96]
+                    print(f"📝 {len(circuits_to_save)}개 회로를 하나의 파일에 저장")
+                    
+                    # 하나의 파일에 모든 회로 저장
+                    filename = f"circuits_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.qasm"
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        f.write(f"// IBM Quantum Job: {job_id}\n")
+                        f.write(f"// Total circuits: {len(circuits_to_save)}\n")
+                        f.write(f"// Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                        
+                        for i, circuit in enumerate(circuits_to_save):
+                            f.write(f"// Circuit {i:04d}\n")
+                            f.write(circuit.qasm())
+                            f.write("\n\n")
+                    
+                    print(f"💾 회로 저장됨: {filename}")
+                    
+                    # 처음 3개 회로만 다이어그램으로 저장
+                    for i in range(min(3, len(circuits_to_save))):
+                        try:
+                            fig_filename = f"circuit_{job_id}_{i:04d}.png"
+                            circuits_to_save[i].draw(output='mpl', filename=fig_filename)
+                            plt.close()
+                        except:
+                            pass  # 다이어그램 저장 실패해도 계속 진행
+                
+                return circuits
+            else:
+                print("⚠️  이 job에서는 회로 정보를 가져올 수 없습니다.")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Job 회로 가져오기 실패: {e}")
+            return None
+    
+    def analyze_job_statistics(self, job_id: str) -> Dict[str, Any]:
+        """
+        Job 결과 통계 분석
+        
+        Args:
+            job_id: IBM Quantum job ID
+            
+        Returns:
+            통계 정보 딕셔너리
+        """
+        try:
+            results_data = self.get_job_results(job_id, save_to_file=False)
+            if not results_data:
+                return {}
+            
+            stats = {
+                'total_circuits': results_data['num_circuits'],
+                'total_shots': 0,
+                'success_rate': 0,
+                'unique_outcomes': set(),
+                'most_common_outcome': None,
+                'outcome_distribution': {}
+            }
+            
+            successful_circuits = 0
+            all_counts = {}
+            
+            for result in results_data['results']:
+                if result['success']:
+                    successful_circuits += 1
+                
+                if result['counts']:
+                    stats['total_shots'] += result['shots']
+                    
+                    # 결과 통합
+                    for outcome, count in result['counts'].items():
+                        stats['unique_outcomes'].add(outcome)
+                        all_counts[outcome] = all_counts.get(outcome, 0) + count
+            
+            stats['success_rate'] = successful_circuits / results_data['num_circuits'] * 100
+            
+            if all_counts:
+                stats['most_common_outcome'] = max(all_counts, key=all_counts.get)
+                stats['outcome_distribution'] = dict(sorted(all_counts.items(), 
+                                                           key=lambda x: x[1], reverse=True)[:10])
+            
+            print(f"📊 Job 통계:")
+            print(f"   총 회로 수: {stats['total_circuits']}")
+            print(f"   총 샷 수: {stats['total_shots']}")
+            print(f"   성공률: {stats['success_rate']:.1f}%")
+            print(f"   고유 결과 수: {len(stats['unique_outcomes'])}")
+            print(f"   가장 빈번한 결과: {stats['most_common_outcome']}")
+            
+            return stats
+            
+        except Exception as e:
+            print(f"❌ 통계 분석 실패: {e}")
+            return {}
 
-def recommend_specific_solutions():
-    """GTX 1060 CC 6.1 전용 해결책"""
-    print("\n=== GTX 1060 CC 6.1 전용 해결책 ===")
-    
-    print("1. 다른 CUDA 버전 패키지 시도:")
-    print("   # 현재 패키지 제거")
-    print("   pip uninstall qiskit-aer-gpu-cu11 qiskit-aer -y")
-    print() 
-    print("   # CUDA 10.2 버전 시도 (더 넓은 CC 지원)")
-    print("   pip install qiskit-aer-gpu-cu102  # 있다면")
-    print()
-    print("   # 또는 일반 CUDA 12 버전")
-    print("   pip install qiskit-aer-gpu")
-    print()
-    
-    print("2. 환경 변수로 CC 강제 지정:")
-    print("   export CUDA_ARCH_LIST=\"6.1\"")
-    print("   export TORCH_CUDA_ARCH_LIST=\"6.1\"")
-    print()
-    
-    print("3. 소스에서 CC 6.1 타겟으로 컴파일:")
-    print("   git clone https://github.com/Qiskit/qiskit-aer.git")
-    print("   cd qiskit-aer")
-    print("   CMAKE_ARGS=\"-DCUDA_ARCH_LIST=6.1\" pip install .")
-    print()
-    
-    print("4. CUDA 드라이버/런타임 다운그레이드:")
-    print("   # CUDA 11.4가 문제일 수 있음")
-    print("   # Windows에서 CUDA 11.2 드라이버 설치")
-    print()
-    
-    print("5. 최후 수단 - CPU 최적화 사용:")
-    print("   pip uninstall qiskit-aer-gpu-cu11 -y")
-    print("   pip install qiskit-aer")
-    print("   # CPU도 GTX 1060보다 빠를 수 있음")
 
 def main():
-    print("CUDA-GPU 호환성 상세 진단")
+    """메인 실행 함수"""
+    print("🚀 IBM Qiskit Job 결과 가져오기 시작")
     print("=" * 50)
     
-    check_cuda_versions()
-    check_compute_capability_support()
-    test_specific_cuda_runtime()
-    recommend_specific_solutions()
+    # Job ID 설정 (여기에 실제 job ID 입력)
+    JOB_ID = "d2830hhogaas73ctdju0"  # 사용자가 제공한 job ID
     
-    print("\n=== 결론 ===")
-    print("GTX 1060 (CC 6.1)은 지원되어야 하지만,")
-    print("qiskit-aer-gpu-cu11 패키지가 CC 6.1을 포함하지 않을 수 있음")
-    print("→ 다른 CUDA 버전 또는 소스 컴파일 필요")
+    try:
+        # Job 가져오기 객체 생성
+        retriever = IBMJobRetriever()
+    
+        # 3. Job 회로 가져오기
+        print("\n3️⃣ Job 회로 가져오기")
+        circuits = retriever.get_job_circuits(JOB_ID)
+        
+
+        
+    except Exception as e:
+        print(f"\n❌ 오류 발생: {e}")
+
 
 if __name__ == "__main__":
     main()

@@ -84,7 +84,7 @@ class EntanglementMetric(QuantumMetric):
     def compute_measured(self, circuit: CircuitSpec, num_shots: int = 2048, 
                         num_repetitions: int = 5) -> List[float]:
         """SWAP test 기반 Meyer-Wallach entropy 측정"""
-        from entangle_hardware import meyer_wallace_entropy_swap_test
+        from core.entangle_hardware import meyer_wallace_entropy_swap_test
         from config import Exp_Box
         
         all_measurements = []
@@ -250,7 +250,8 @@ class StatisticalValidator:
         total_circuits = len(circuits)
         for i, circuit in enumerate(circuits):
             circuit_count += 1
-            circuit.circuit_id = f"{exp_config.num_qubits}q_{exp_config.depth}d_{i}"
+            # 회로 ID는 이미 random_circuit_generator에서 올바르게 설정됨
+            # circuit.circuit_id = f"{exp_config.num_qubits}q_{exp_config.depth}d_{i}"  # 제거
             
             print(f"    회로 {circuit_count}/{total_circuits}: {circuit.circuit_id}")
             
@@ -332,27 +333,71 @@ class ValidationVisualizer:
             print("❌ 시각화할 결과가 없습니다.")
             return
         
-        # 데이터 준비 (간소화)
+        # 데이터 준비 (repetition 고려한 올바른 인덱싱)
         exact_values = []
         measured_values = []
         
-        for result in results:
-            # 정확한 값이 하나면 모든 측정값과 비교
+        print(f"🔍 시각화 데이터 준비 중... (총 {len(results)}개 결과)")
+        
+        for i, result in enumerate(results):
             exact_vals = result.exact_values
             measured_vals = result.measured_values
             
-            if len(exact_vals) == 1:
-                exact_vals = exact_vals * len(measured_vals)
+            print(f"  결과 {i+1}: exact={len(exact_vals)}개, measured={len(measured_vals)}개")
             
-            exact_values.extend(exact_vals)
-            measured_values.extend(measured_vals)
+            # repetition=3인 경우: 각 회로마다 정확한 값 1개, 측정값 3개
+            if len(exact_vals) == 1 and len(measured_vals) > 1:
+                # 정확한 값을 측정값 개수만큼 복제
+                exact_for_this_circuit = [exact_vals[0]] * len(measured_vals)
+                exact_values.extend(exact_for_this_circuit)
+                measured_values.extend(measured_vals)
+            elif len(exact_vals) == len(measured_vals):
+                # 길이가 같으면 그대로 사용
+                exact_values.extend(exact_vals)
+                measured_values.extend(measured_vals)
+            else:
+                # 길이 불일치 시 최소 길이로 맞춤
+                min_len = min(len(exact_vals), len(measured_vals))
+                exact_values.extend(exact_vals[:min_len])
+                measured_values.extend(measured_vals[:min_len])
+                print(f"    ⚠️ 길이 불일치로 {min_len}개로 조정")
         
         exact_values = np.array(exact_values)
         measured_values = np.array(measured_values)
         
+        # 2차원 배열 문제 해결: measured_values를 1차원으로 평탄화
+        if measured_values.ndim > 1:
+            print(f"⚠️ measured_values가 {measured_values.ndim}차원 배열입니다. 1차원으로 평탄화합니다.")
+            measured_values = measured_values.flatten()
+        
+        # exact_values도 동일하게 처리
+        if exact_values.ndim > 1:
+            print(f"⚠️ exact_values가 {exact_values.ndim}차원 배열입니다. 1차원으로 평탄화합니다.")
+            exact_values = exact_values.flatten()
+        
+        # 상세 디버깅 정보
+        print(f"\n🔍 최종 배열 길이 확인 (평탄화 후):")
+        print(f"  - exact_values: {len(exact_values)}개 (shape: {exact_values.shape})")
+        print(f"  - measured_values: {len(measured_values)}개 (shape: {measured_values.shape})")
+        print(f"  - exact_values 내용: {exact_values}")
+        print(f"  - measured_values 내용: {measured_values}")
+        
         if len(exact_values) == 0:
             print("❌ 시각화할 데이터가 없습니다.")
             return
+            
+        # 길이 불일치 최종 체크 및 강제 수정
+        if len(exact_values) != len(measured_values):
+            print(f"\n⚠️ 최종 배열 길이 불일치 감지!")
+            print(f"  - exact_values: {len(exact_values)}개")
+            print(f"  - measured_values: {len(measured_values)}개")
+            
+            min_length = min(len(exact_values), len(measured_values))
+            exact_values = exact_values[:min_length]
+            measured_values = measured_values[:min_length]
+            print(f"  - 강제 조정된 길이: {min_length}개")
+            print(f"  - 조정 후 exact_values: {exact_values}")
+            print(f"  - 조정 후 measured_values: {measured_values}")
         
         # 핵심 통계 지표 계산
         n_samples = len(exact_values)
