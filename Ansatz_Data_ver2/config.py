@@ -49,6 +49,20 @@ class Exp_Box:
         entangle_shots=512,    #얽힘도 측정용
         num_samples=7          # 표현력 샘플 수 최소화 (2개면 1개 페어)
     )
+
+    simulator_data_set = ExperimentConfig(
+        num_qubits=[3, 4,5,6,7,8,9,10,11,12,13,14,15],  # 12개 큐빗 수준
+        depth=[1, 2, 3, 4,5,6,7],  # 2개 깊이 (너무 많으면 샷 수 폭증)
+        shots=1024,     # 표현력 측정용 (감소)
+        num_circuits=3,  # 회로 수 최소화
+        optimization_level=3,
+        two_qubit_ratio=[0.3,0.4,0.5,0.6,0.7,0.8],  # 1개 비율만 (다양성 줄임)
+        exp_name="simulator_data_set",
+        fidelity_shots=1024,    # 피델리티 측정용
+        executor=None,
+        entangle_shots=1024,    #얽힘도 측정용
+        num_samples=10          # 표현력 샘플 수 최소화 (2개면 1개 페어)
+    )
     
     # 샷 수 계산 검증용 설정
     exp1 = ExperimentConfig(

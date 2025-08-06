@@ -238,16 +238,16 @@ class IBMExecutor(AbstractQuantumExecutor):
         transpiled_circuits = self._transpile_circuits(qiskit_circuits)
         
         # IBM Quantum에서 실행
-        job = self._sampler.run(transpiled_circuits)
-        results = job.result()
+        # job = self._sampler.run(transpiled_circuits)
+        # results = job.result()
 
         #테스트용 코드
-        # results = []
-        # from qiskit_aer import AerSimulator
-        # sim = AerSimulator()
-        # result = sim.run(transpiled_circuits).result()
-        # for i in range(len(transpiled_circuits)):
-        #     results.append(result.get_counts(i))
+        results = []
+        from qiskit_aer import AerSimulator
+        sim = AerSimulator()
+        result = sim.run(transpiled_circuits).result()
+        for i in range(len(transpiled_circuits)):
+            results.append(result.get_counts(i))
         
         # 결과 처리
         execution_results = self._process_batch_results(results, qiskit_circuits, original_classical_bits, exp_config, start_time)
@@ -321,8 +321,8 @@ class IBMExecutor(AbstractQuantumExecutor):
         
         # results는 단일 Result 객체, 각 회로의 결과는 인덱스로 접근
         for i, result in enumerate(results):
-            raw_counts = result.data.meas.get_counts() #원래코드임, 지우지 말것것
-            #raw_counts = result 테스트용 지우지 말것것
+            #raw_counts = result.data.meas.get_counts() #원래코드임, 지우지 말것것
+            raw_counts = result #테스트용 지우지 말것것
             # 각 회로의 원래 클래식 레지스터 수만큼만 자르기
             counts = self._truncate_counts_to_original_qubits(raw_counts, original_classical_bits[i])
             

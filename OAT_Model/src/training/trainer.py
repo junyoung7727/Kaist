@@ -14,12 +14,14 @@ from typing import Dict, Any
 import wandb
 import random
 import numpy as np
+from typing import Optional, List, Tuple, Any, Union, Dict  
 import os
+from dataclasses import dataclass
 
 from src.models.decision_transformer import DecisionTransformerLoss
 
 # 디버그 모드 설정 (환경변수로 제어)
-DEBUG_MODE = os.getenv('DT_DEBUG', 'False').lower() == 'true'
+DEBUG_MODE = 'False'
 
 def debug_print(*args, **kwargs):
     """디버그 모드일 때만 출력"""
