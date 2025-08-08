@@ -403,7 +403,9 @@ class ResultDistributor:
         
         # purity = 2 * P(0) - 1
         purity = 2 * zero_probability - 1
-        
+        if purity > 1:
+            print("purity error")
+            exit()
         return purity
     
     @staticmethod

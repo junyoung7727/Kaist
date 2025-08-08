@@ -81,7 +81,7 @@ class EntanglementMetric(QuantumMetric):
         # 단일 값으로 반환 (리스트 형태로 맞춤)
         return [mw_entropy]
     
-    def compute_measured(self, circuit: CircuitSpec, num_shots: int = 2048, 
+    def compute_measured(self, circuit: List[CircuitSpec], num_shots: int = 2048, 
                         num_repetitions: int = 5) -> List[float]:
         """SWAP test 기반 Meyer-Wallach entropy 측정"""
         from core.entangle_hardware import meyer_wallace_entropy_swap_test
@@ -487,6 +487,31 @@ class ValidationVisualizer:
         
         plt.tight_layout()
         
+        # 통계 요약 텍스트 생성
+        stats_summary = f"""Statistical Validation Summary for {self.metric_name}
+{'='*60}
+
+Validation Results:
+   Sample size (n): {n_samples}
+   Pearson's r: {r_value:.4f} (p = {p_value:.2e})
+   R² coefficient: {r2_score:.4f}
+   95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]
+   RMSE: {rmse:.4f}
+   MAE: {mae:.4f}
+
+Data Summary:
+   Theoretical values - Mean: {np.mean(exact_values):.4f}, Std: {np.std(exact_values):.4f}
+   Measured values - Mean: {np.mean(measured_values):.4f}, Std: {np.std(measured_values):.4f}
+   Error statistics - Mean: {np.mean(errors):.4f}, Std: {np.std(errors):.4f}
+
+Validation Quality Assessment:
+   Correlation strength: {'Excellent' if r_value > 0.9 else 'Good' if r_value > 0.7 else 'Moderate' if r_value > 0.5 else 'Poor'}
+   Measurement precision: {'High' if rmse < 0.1 else 'Medium' if rmse < 0.2 else 'Low'}
+   Statistical significance: {'Highly significant' if p_value < 0.001 else 'Significant' if p_value < 0.05 else 'Not significant'}
+
+Generated on: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        
         # 콘솔 출력 (논문용 요약)
         print(f"\n📊 Statistical Validation Summary for {self.metric_name}:")
         print(f"   Sample size (n): {n_samples}")
@@ -501,6 +526,11 @@ class ValidationVisualizer:
             # 기본 경로에서 확장자 제거
             base_path = save_path.rsplit('.', 1)[0] if '.' in save_path else save_path
             
+            # 통계 요약을 텍스트 파일로 저장
+            stats_path = f"{base_path}_statistics.txt"
+            with open(stats_path, 'w', encoding='utf-8') as f:
+                f.write(stats_summary)
+            
             # 상관관계 플롯 저장
             correlation_path = f"{base_path}_correlation.png"
             fig1.savefig(correlation_path, dpi=300, bbox_inches='tight', 
@@ -513,7 +543,8 @@ class ValidationVisualizer:
                         facecolor='white', edgecolor='none', 
                         format='png', transparent=False)
             
-            print(f"\n💾 Saved correlation plot: {correlation_path}")
+            print(f"\n💾 Saved statistical summary: {stats_path}")
+            print(f"💾 Saved correlation plot: {correlation_path}")
             print(f"💾 Saved error distribution plot: {error_path}")
         
         plt.show()

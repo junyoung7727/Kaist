@@ -1,0 +1,22 @@
+Statistical Validation Summary for Expressibility
+============================================================
+
+Validation Results:
+   Sample size (n): 432
+   Pearson's r: 0.9414 (p = 5.30e-205)
+   R² coefficient: 0.8202
+   95% CI: [0.9296, 0.9512]
+   RMSE: 0.1101
+   MAE: 0.0799
+
+Data Summary:
+   Theoretical values - Mean: 0.5411, Std: 0.2797
+   Measured values - Mean: 0.4846, Std: 0.2595
+   Error statistics - Mean: -0.0565, Std: 0.0945
+
+Validation Quality Assessment:
+   Correlation strength: Excellent
+   Measurement precision: Medium
+   Statistical significance: Highly significant
+
+Generated on: 2025-08-08 11:03:06

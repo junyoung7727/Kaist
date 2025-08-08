@@ -27,7 +27,10 @@ def main():
     output_dir.mkdir(exist_ok=True)
     
     # 실험 설정 사용
+    
     exp_config = Exp_Box.statistical_validation_config
+    from execution.executor import QuantumExecutorFactory
+    exp_config.executor = QuantumExecutorFactory.create_executor('ibm')
     num_repetitions = 3
     
     print("🚀 Meyer-Wallach Entanglement 통계적 검증 시작")
@@ -82,7 +85,17 @@ def main():
         print(f"   • 총 측정 횟수: {total_measurements}회")
         print(f"   • 평균 RMSE: {avg_rmse:.6f}")
         print(f"   • 결과 저장: {output_dir}/entanglement_validation.png")
+
+    if 'expressibility' in results and results['expressibility']:
+        total_measurements = sum(len(r.measured_values) for r in results['expressibility'])
+        avg_rmse = sum(r.statistics['rmse'] for r in results['expressibility']) / len(results['expressibility'])
     
+        print(f"🎯 EXPRESSIBILITY:")
+        print(f"   • 검증된 회로: {len(expressibility_results)}개")
+        print(f"   • 총 측정 횟수: {total_measurements}회")
+        print(f"   • 평균 RMSE: {avg_rmse:.6f}")
+        print(f"   • 결과 저장: {output_dir}/expressibility_validation.png")
+
     print(f"\n🎉 검증이 완료되었습니다!")
     print(f"📁 결과는 {output_dir} 디렉토리에 저장되었습니다.")
     

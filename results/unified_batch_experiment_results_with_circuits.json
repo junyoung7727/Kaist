@@ -6,12 +6,48 @@
       "num_qubits": 3,
       "gates": [
         {
-          "name": "ry",
+          "name": "p",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            3.881273001360333
+          ]
+        },
+        {
+          "name": "rx",
           "qubits": [
             0
           ],
           "parameters": [
-            5.756619905354404
+            1.5098935065653776
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            4.5191193905696405
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            0.26967764543807077
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            1.182464565213548
           ]
         },
         {
@@ -20,7 +56,50 @@
             0
           ],
           "parameters": [
-            0.05468531249990738
+            6.174041370308167
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            3.2511258088351696
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            2.121698014974579
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.0281827927321623
+          ]
+        },
+        {
+          "name": "tdg",
+          "qubits": [
+            1
+          ],
+          "parameters": []
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            5.908625193537247
           ]
         },
         {
@@ -29,7 +108,206 @@
             0
           ],
           "parameters": [
-            3.7649361920091042
+            3.811571419449447
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            5.460349722880067
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            0.42321765984701304
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            4.3621833364754705
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            4.405830419339239
+          ]
+        },
+        {
+          "name": "crx",
+          "qubits": [
+            2,
+            0
+          ],
+          "parameters": [
+            3.0915659613932185
+          ]
+        },
+        {
+          "name": "crx",
+          "qubits": [
+            1,
+            2
+          ],
+          "parameters": [
+            4.765766549481678
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            4.184161996161601
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            1.1252818825887743
+          ]
+        }
+      ],
+      "qasm": null
+    },
+    "exp1_3q_d5_r0.3_0": {
+      "circuit_id": "exp1_3q_d5_r0.3_0",
+      "num_qubits": 3,
+      "gates": [
+        {
+          "name": "rz",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            2.587275638327403
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            1.7448047709986059
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            0.5948048960966762
+          ]
+        },
+        {
+          "name": "y",
+          "qubits": [
+            1
+          ],
+          "parameters": []
+        },
+        {
+          "name": "crz",
+          "qubits": [
+            2,
+            0
+          ],
+          "parameters": [
+            1.381734370420412
+          ]
+        },
+        {
+          "name": "crx",
+          "qubits": [
+            1,
+            2
+          ],
+          "parameters": [
+            5.390328823209179
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            0.23457063608269116
+          ]
+        },
+        {
+          "name": "rz",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            4.192156662432607
+          ]
+        },
+        {
+          "name": "crz",
+          "qubits": [
+            0,
+            2
+          ],
+          "parameters": [
+            5.670855059351384
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            3.4494677423211755
+          ]
+        },
+        {
+          "name": "ry",
+          "qubits": [
+            1
+          ],
+          "parameters": [
+            5.50448276687325
+          ]
+        },
+        {
+          "name": "rx",
+          "qubits": [
+            2
+          ],
+          "parameters": [
+            3.8176377729343836
+          ]
+        },
+        {
+          "name": "p",
+          "qubits": [
+            0
+          ],
+          "parameters": [
+            5.918056454133994
           ]
         },
         {
@@ -42,55 +320,10 @@
         {
           "name": "rz",
           "qubits": [
-            1
-          ],
-          "parameters": [
-            1.7607529058872549
-          ]
-        },
-        {
-          "name": "ry",
-          "qubits": [
             0
           ],
           "parameters": [
-            5.164884674534696
-          ]
-        },
-        {
-          "name": "ry",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            0.18561281178375613
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            0
-          ],
-          "parameters": [
-            3.6915036839101494
-          ]
-        },
-        {
-          "name": "ry",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            4.710283609438151
-          ]
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            3.1072751390104516
+            2.6110715469920813
           ]
         },
         {
@@ -99,212 +332,16 @@
             2
           ],
           "parameters": [
-            0.4329499340468018
+            3.7976174643973764
           ]
         },
         {
-          "name": "rx",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            1.1466325107185518
-          ]
-        },
-        {
-          "name": "y",
-          "qubits": [
-            0
-          ],
-          "parameters": []
-        },
-        {
-          "name": "p",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            5.804633672865588
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            1.5434287628537449
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            2
-          ],
-          "parameters": [
-            4.199960822141244
-          ]
-        },
-        {
-          "name": "cry",
+          "name": "cy",
           "qubits": [
             1,
             2
           ],
-          "parameters": [
-            3.1339833565312722
-          ]
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            2
-          ],
-          "parameters": [
-            1.1805626791924198
-          ]
-        },
-        {
-          "name": "p",
-          "qubits": [
-            2
-          ],
-          "parameters": [
-            6.209718801567243
-          ]
-        },
-        {
-          "name": "p",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            3.5694852650723723
-          ]
-        }
-      ],
-      "qasm": null
-    },
-    "exp1_3q_d5_r0.3_0": {
-      "circuit_id": "exp1_3q_d5_r0.3_0",
-      "num_qubits": 3,
-      "gates": [
-        {
-          "name": "p",
-          "qubits": [
-            0
-          ],
-          "parameters": [
-            1.63682386380615
-          ]
-        },
-        {
-          "name": "ry",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            3.8084006595554745
-          ]
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            0
-          ],
-          "parameters": [
-            0.9525792163602955
-          ]
-        },
-        {
-          "name": "ry",
-          "qubits": [
-            0
-          ],
-          "parameters": [
-            2.267363577460397
-          ]
-        },
-        {
-          "name": "cry",
-          "qubits": [
-            0,
-            1
-          ],
-          "parameters": [
-            5.684696646459034
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            2
-          ],
-          "parameters": [
-            5.209199822276037
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            1.421334889902627
-          ]
-        },
-        {
-          "name": "p",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            1.0695086517312258
-          ]
-        },
-        {
-          "name": "y",
-          "qubits": [
-            0
-          ],
           "parameters": []
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            4.73691003637008
-          ]
-        },
-        {
-          "name": "rx",
-          "qubits": [
-            0
-          ],
-          "parameters": [
-            2.5540634602694445
-          ]
-        },
-        {
-          "name": "p",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            5.304901697406222
-          ]
-        },
-        {
-          "name": "crx",
-          "qubits": [
-            0,
-            2
-          ],
-          "parameters": [
-            3.1654235706105136
-          ]
         },
         {
           "name": "crz",
@@ -313,61 +350,25 @@
             2
           ],
           "parameters": [
-            4.844720895487052
+            6.042744055765826
           ]
         },
         {
-          "name": "cx",
-          "qubits": [
-            2,
-            1
-          ],
-          "parameters": []
-        },
-        {
-          "name": "p",
+          "name": "ry",
           "qubits": [
             0
           ],
           "parameters": [
-            2.8057738242839014
+            0.9574294294033288
           ]
         },
         {
-          "name": "cry",
-          "qubits": [
-            0,
-            1
-          ],
-          "parameters": [
-            2.793178221588369
-          ]
-        },
-        {
-          "name": "p",
+          "name": "rx",
           "qubits": [
             0
           ],
           "parameters": [
-            1.7460432490819606
-          ]
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            5.939457180324049
-          ]
-        },
-        {
-          "name": "rz",
-          "qubits": [
-            1
-          ],
-          "parameters": [
-            3.0154554787207104
+            0.3426107167207536
           ]
         }
       ],
@@ -379,25 +380,25 @@
       "circuit_id": "exp1_3q_d5_r0.1_0",
       "num_qubits": 3,
       "depth": 20,
-      "timestamp": "2025-08-04T16:30:13.701523",
+      "timestamp": "2025-08-07T08:19:28.255772",
       "fidelity": 1.0,
       "robust_fidelity": 1.0,
       "expressibility": {
-        "kl_divergence": 0.0
+        "kl_divergence": 14.61815902255258
       },
-      "entanglement": 0.15755208333333326
+      "entanglement": 0.31119791666666674
     },
     "exp1_3q_d5_r0.3_0": {
       "circuit_id": "exp1_3q_d5_r0.3_0",
       "num_qubits": 3,
       "depth": 20,
-      "timestamp": "2025-08-04T16:30:13.701523",
+      "timestamp": "2025-08-07T08:19:28.255772",
       "fidelity": 1.0,
       "robust_fidelity": 1.0,
       "expressibility": {
-        "kl_divergence": 0.0
+        "kl_divergence": 21.927238533828874
       },
-      "entanglement": 0.6002604166666667
+      "entanglement": 0.31770833333333326
     }
   },
   "summary": {

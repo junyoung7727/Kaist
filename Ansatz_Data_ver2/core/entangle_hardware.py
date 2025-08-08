@@ -78,7 +78,7 @@ def meyer_wallace_entropy_swap_test(circuits: Union[CircuitSpec, List[CircuitSpe
     
     # 2단계: 모든 SWAP test를 한 번에 실행
     print(f"  한 번에 실행할 SWAP test: {len(all_swap_jobs)}개")
-    batch_results = _execute_swap_batch(all_swap_jobs, num_shots)
+    batch_results = _execute_swap_batch(all_swap_jobs, num_shots, exp_config)
     
     # 3단계: 결과를 회로별로 매핑
     results = []
@@ -155,31 +155,43 @@ def _create_swap_test_circuit(circuit: CircuitSpec, target_qubit: int):
     return swap_qc
 
 
-def _execute_swap_batch(swap_circuits: List, num_shots: int, exp_config: ExperimentConfig) -> List[tuple]:
+def _execute_swap_batch(swap_circuits, num_shots, exp_config):
     """
     모든 SWAP test 회로를 배치로 실행
     
     Args:
-        swap_circuits: SWAP test 회로 리스트
+        swap_circuits: SWAP test 회로 리스트 (QuantumCircuit 객체들)
         num_shots: 측정 횟수
+        exp_config: 실험 설정
         
     Returns:
-        (zero_probability, purity) 튜플 리스트
+        purity 값 리스트
     """
+    from execution.executor import QuantumExecutorFactory
+    from core.circuit_interface import CircuitSpec, GateOperation
     
-    
+    # 실제로는 이미 구성된 Qiskit 회로를 사용해야 하므로
+    # 직접 실행하는 방식으로 변경
     batch_results = []
+
+    import qiskit_aer as Aer
     
+    results = Aer.AerSimulator().run(swap_circuits, shots=num_shots).result()
+    # 각 회로를 개별적으로 실행 (배치 처리는 나중에 최적화)
     for i, swap_circuit in enumerate(swap_circuits):
+        # 임시로 시뮬레이터 사용 (실제 IBM 하드웨어 연결 없이 테스트)
         counts = results.get_counts(i)
         
-        # ancilla=0 확률 계산
-        ancilla_0_count = counts.get('0', 0)
-        zero_probability = ancilla_0_count / num_shots
+        # ancilla=0 확률 계산 (첫 번째 비트가 ancilla)
+        total_shots = sum(counts.values())
+        ancilla_0_count = sum(count for bitstring, count in counts.items() if bitstring[0] == '0')
+        zero_probability = ancilla_0_count / total_shots
         
         # purity 계산: 2 * P(ancilla=0) - 1
         purity = 2 * zero_probability - 1
         
+        # purity는 0과 1 사이여야 함
+        purity = max(0, min(1, purity))
         batch_results.append(purity)
     
     return batch_results

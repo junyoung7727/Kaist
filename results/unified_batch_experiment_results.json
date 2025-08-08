@@ -1,0 +1,45 @@
+{
+  "experiment_name": "exp1",
+  "experiment_config": {
+    "num_qubits": [
+      3
+    ],
+    "depth": [
+      5
+    ],
+    "shots": 1024,
+    "num_circuits": 1,
+    "optimization_level": 1,
+    "two_qubit_ratio": [
+      0.1,
+      0.3
+    ]
+  },
+  "results": [
+    {
+      "circuit_id": "exp1_3q_d5_r0.1_0",
+      "num_qubits": 3,
+      "depth": 20,
+      "timestamp": "2025-08-07T08:19:28.255772",
+      "fidelity": 1.0,
+      "robust_fidelity": 1.0,
+      "expressibility": {
+        "kl_divergence": 14.61815902255258
+      },
+      "entanglement": 0.31119791666666674
+    },
+    {
+      "circuit_id": "exp1_3q_d5_r0.3_0",
+      "num_qubits": 3,
+      "depth": 20,
+      "timestamp": "2025-08-07T08:19:28.255772",
+      "fidelity": 1.0,
+      "robust_fidelity": 1.0,
+      "expressibility": {
+        "kl_divergence": 21.927238533828874
+      },
+      "entanglement": 0.31770833333333326
+    }
+  ],
+  "summary": {}
+}

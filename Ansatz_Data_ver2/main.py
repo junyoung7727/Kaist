@@ -421,7 +421,7 @@ def main():
     try:
         # 설정 로드
         exp_box = Exp_Box()
-        exp_config = exp_box.get_setting("exp1")
+        exp_config = exp_box.get_setting("simulator_data_set")
         
         print(f"\n📋 실험 설정:")
         print(f"   - 큐빗 수: {exp_config.num_qubits}")
