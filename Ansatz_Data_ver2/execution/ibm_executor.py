@@ -16,6 +16,7 @@ from execution.executor import AbstractQuantumExecutor, ExecutionResult, registe
 from config import default_config, ExperimentConfig
 from core.qiskit_circuit import QiskitQuantumCircuit
 from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec
+from core.batch_size_calculator import calculate_dynamic_batch_sizes
 from qiskit_ibm_runtime import SamplerV2 as Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
@@ -155,15 +156,20 @@ class IBMExecutor(AbstractQuantumExecutor):
             
         print(f"\n🚀 IBM Quantum 배치 실행 시작: {len(qiskit_circuits)}개 회로")
         
-        # IBM 샷 수 제한 고려 자동 분할
-        max_circuits_per_batch = self._calculate_max_batch_size(qiskit_circuits, exp_config)
+        # 동적 배치 크기 계산 (회로별 메모리 사용량 기반)
+        batch_sizes = calculate_dynamic_batch_sizes(
+            circuits=qiskit_circuits,
+            shots_per_circuit=exp_config.shots,
+            backend_type="aer",
+            verbose=True
+        )
         
-        if len(qiskit_circuits) <= max_circuits_per_batch:
+        if len(batch_sizes) == 1 and batch_sizes[0] >= len(qiskit_circuits):
             # 단일 배치로 처리 가능
             return self._execute_single_batch(qiskit_circuits, exp_config)
         else:
             # 다중 배치로 분할 처리
-            return self._execute_multiple_batches(qiskit_circuits, exp_config, max_circuits_per_batch)
+            return self._execute_multiple_batches(qiskit_circuits, exp_config, batch_sizes)
     
     def _calculate_max_batch_size(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig) -> int:
         """
@@ -255,32 +261,46 @@ class IBMExecutor(AbstractQuantumExecutor):
         print(f"✅ 단일 배치 완료: {len(execution_results)}개 결과")
         return execution_results
     
-    def _execute_multiple_batches(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig, max_batch_size: int) -> List[ExecutionResult]:
+    def _execute_multiple_batches(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig, batch_sizes: List[int]) -> List[ExecutionResult]:
         """
-        다중 배치로 분할 실행
+        동적 배치 크기를 사용한 다중 배치 분할 실행
+        
+        Args:
+            qiskit_circuits: 실행할 양자 회로 리스트
+            exp_config: 실험 설정
+            batch_sizes: 각 배치의 크기를 담은 리스트
         """
         total_circuits = len(qiskit_circuits)
-        num_batches = (total_circuits + max_batch_size - 1) // max_batch_size
+        num_batches = len(batch_sizes)
         
-        print(f"🔄 다중 배치 실행: {total_circuits}개 회로를 {num_batches}개 배치로 분할 (최대 {max_batch_size}개/배치)")
+        print(f"🔄 동적 다중 배치 실행: {total_circuits}개 회로를 {num_batches}개 배치로 분할")
+        print(f"   배치 크기: {batch_sizes}")
         
         all_results = []
+        circuit_idx = 0
         
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * max_batch_size
-            end_idx = min(start_idx + max_batch_size, total_circuits)
+        for batch_idx, batch_size in enumerate(batch_sizes):
+            # 현재 배치의 회로들 선택
+            start_idx = circuit_idx
+            end_idx = min(circuit_idx + batch_size, total_circuits)
             batch_circuits = qiskit_circuits[start_idx:end_idx]
+            actual_batch_size = len(batch_circuits)
             
-            print(f"\n📦 배치 {batch_idx + 1}/{num_batches}: {len(batch_circuits)}개 회로 (인덱스 {start_idx}-{end_idx-1})")
+            print(f"\n📦 배치 {batch_idx + 1}/{num_batches}: {actual_batch_size}개 회로 (인덱스 {start_idx}-{end_idx-1})")
+            
+            # 배치 크기가 0이면 건너뛰기
+            if actual_batch_size == 0:
+                print(f"⚠️  배치 {batch_idx + 1} 건너뛰기: 회로 없음")
+                continue
             
             try:
                 batch_results = self._execute_single_batch(batch_circuits, exp_config)
                 all_results.extend(batch_results)
-                print(f"✅ 배치 {batch_idx + 1} 완료")
+                print(f"✅ 배치 {batch_idx + 1} 완료: {len(batch_results)}개 결과")
             except Exception as e:
                 print(f"❌ 배치 {batch_idx + 1} 실패: {e}")
                 # 실패한 배치에 대해 빈 결과 추가
-                for i in range(len(batch_circuits)):
+                for i in range(actual_batch_size):
                     all_results.append(ExecutionResult(
                         counts={},
                         shots=exp_config.shots,
@@ -290,8 +310,14 @@ class IBMExecutor(AbstractQuantumExecutor):
                         success=False,
                         error_message=str(e)
                     ))
+            
+            circuit_idx = end_idx
+            
+            # 모든 회로를 처리했으면 종료
+            if circuit_idx >= total_circuits:
+                break
         
-        print(f"\n🎉 모든 배치 완료: {len(all_results)}개 결과")
+        print(f"\n🎉 모든 동적 배치 완료: {len(all_results)}개 결과")
         return all_results
     
     def _transpile_circuits(self, qiskit_circuits: List[QuantumCircuit]) -> List[QuantumCircuit]:

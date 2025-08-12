@@ -153,6 +153,17 @@ class QuantumGateRegistry:
         self.gate_vocab['[EMPTY]'] = len(self.gate_vocab) + 1
         return self.gate_vocab
     
+    def get_gate_count(self) -> int:
+        """총 gate type 수 반환 (vocab 크기)"""
+        vocab = self.get_gate_vocab()
+        return len(vocab)
+    
+    @classmethod
+    def get_singleton_gate_count(cls) -> int:
+        """싱글톤 인스턴스에서 gate 수 반환"""
+        registry = cls()
+        return registry.get_gate_count()
+    
     def get_gate(self, name: str) -> Optional[GateDefinition]:
         """게이트 정의 반환"""
         return self._gates.get(name.lower())
@@ -258,3 +269,8 @@ def validate_gate_operation(name: str, qubits: List[int], parameters: List[float
         return False
     
     return True
+
+a = QuantumGateRegistry()
+ga = a.get_gate_vocab()
+print(ga)
+print(len(ga))

@@ -14,23 +14,21 @@ from typing import Dict, Any
 import wandb
 import random
 import numpy as np
+import sys
 from typing import Optional, List, Tuple, Any, Union, Dict  
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from src.models.decision_transformer import DecisionTransformerLoss
 
-# 디버그 모드 설정 (환경변수로 제어)
-DEBUG_MODE = 'False'
+# 공통 디버그 유틸리티 사용
+from utils.debug_utils import debug_print, debug_tensor_info
 
-def debug_print(*args, **kwargs):
-    """디버그 모드일 때만 출력"""
-    if DEBUG_MODE:
-        print(*args, **kwargs)
+# 🎆 NEW: 게이트 레지스트리 싱글톤 임포트
+sys.path.append(str(Path(__file__).parent.parent.parent.parent / "quantumcommon"))
+from gates import QuantumGateRegistry
 
 import time
-import sys
-
 # wandb 선택적으로 임포트
 try:
     import wandb
@@ -61,14 +59,21 @@ class TrainingConfig:
     d_model: int = 512
     n_layers: int = 6
     n_heads: int = 8
-    n_gate_types: int = 20
+    n_gate_types: int = None  # 🎆 NEW: gate vocab 싱글톤에서 자동 설정
     dropout: float = 0.1
+    attention_mode: str = "standard"  # "standard", "advanced", "hybrid"
+    
+    def __post_init__(self):
+        """초기화 후 gate 수를 싱글톤에서 가져오기"""
+        if self.n_gate_types is None:
+            self.n_gate_types = QuantumGateRegistry.get_singleton_gate_count()
+            print(f"🎆 TrainingConfig: Using gate vocab singleton, n_gate_types = {self.n_gate_types}")
     
     # 학습 설정
     learning_rate: float = 1e-4
     weight_decay: float = 0.01
     batch_size: int = 32
-    num_epochs: int = 100
+    num_epochs: int = 1
     warmup_steps: int = 1000
     
     # 검증 설정
@@ -108,38 +113,63 @@ class QuantumCircuitCollator:
             
     
     def _create_target_actions(self, batch_data: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """타겟 액션 생성 - 다음 게이트 타입을 예측하도록"""
+        """임베딩된 시퀀스에서 다음 액션을 추출하여 타겟 생성"""
         # action_prediction_mask의 형태 확인
         action_mask_shape = batch_data['action_prediction_mask'].shape
-        print(f"Debug: action_prediction_mask shape: {action_mask_shape}")
+        debug_print(f"Debug: action_prediction_mask shape: {action_mask_shape}")
         
         batch_size = len(batch_data['circuit_id'])
         # input_sequence: [batch, 1, seq_len, d_model] -> seq_len은 shape[2]
         max_seq_len = batch_data['input_sequence'].shape[2]
         
-        print(f"Debug: Creating target_actions with shape [{batch_size}, {max_seq_len}]")
+        debug_print(f"Debug: Creating target_actions with shape [{batch_size}, {max_seq_len}]")
         target_actions = torch.zeros(batch_size, max_seq_len, dtype=torch.long)
         
-        # 실제 게이트 타입 정보를 사용하여 타겟 생성
-        # 현재는 간단한 다음 게이트 예측 로직 사용
-        for i in range(batch_size):
-            # action_prediction_mask 처리
-            if len(action_mask_shape) == 3:  # [batch_size, 1, seq_len] 형태
-                action_mask = batch_data['action_prediction_mask'][i].squeeze(0)
-            elif len(action_mask_shape) == 2:  # [batch_size, seq_len] 형태
-                action_mask = batch_data['action_prediction_mask'][i]
-            else:  # 1차원 형태
-                action_mask = batch_data['action_prediction_mask']
+        # 이미 임베딩 파이프라인에서 계산된 target_actions 사용
+        if 'target_actions' in batch_data:
+            debug_print("Debug: Using pre-computed target_actions from embedding pipeline")
+            # 임베딩 파이프라인에서 이미 계산된 타겟 사용
+            pipeline_targets = batch_data['target_actions']
             
-            print(f"Debug: action_mask[{i}] shape: {action_mask.shape}")
+            # 차원 맞추기
+            if len(pipeline_targets.shape) == 3:  # [batch, 1, seq_len]
+                pipeline_targets = pipeline_targets.squeeze(1)  # [batch, seq_len]
             
-            # 실제 게이트 타입 정보가 있다면 사용, 없으면 유효한 랜덤 값
-            n_actions = action_mask.sum().item()
-            if n_actions > 0:
-                # 0-19 범위의 유효한 게이트 타입 인덱스 생성 (20개 게이트 타입)
-                valid_gate_types = torch.randint(0, 20, (n_actions,))
-                target_actions[i][action_mask] = valid_gate_types
-                print(f"Debug: Generated {n_actions} targets with values: {valid_gate_types[:5]}...")
+            # 배치 크기와 시퀀스 길이 맞추기
+            target_batch_size = min(batch_size, pipeline_targets.shape[0])
+            target_seq_len = min(max_seq_len, pipeline_targets.shape[1])
+            
+            target_actions[:target_batch_size, :target_seq_len] = pipeline_targets[:target_batch_size, :target_seq_len]
+            debug_print(f"Debug: Copied target_actions shape: [{target_batch_size}, {target_seq_len}]")
+            
+        else:
+            debug_print("Warning: No pre-computed target_actions found, using fallback")
+            # 폴백: State-Action-Reward 시퀀스에서 다음 Action 추출
+            for i in range(batch_size):
+                # action_prediction_mask 처리
+                if len(action_mask_shape) == 3:  # [batch_size, 1, seq_len] 형태
+                    action_mask = batch_data['action_prediction_mask'][i].squeeze(0)
+                elif len(action_mask_shape) == 2:  # [batch_size, seq_len] 형태
+                    action_mask = batch_data['action_prediction_mask'][i]
+                else:  # 1차원 형태
+                    action_mask = batch_data['action_prediction_mask']
+                
+                debug_print(f"Debug: action_mask[{i}] shape: {action_mask.shape}")
+                
+                # State-Action-Reward 패턴에서 다음 Action 위치 찾기
+                action_positions = torch.where(action_mask)[0]
+                for pos_idx, seq_pos in enumerate(action_positions):
+                    # 다음 Action 위치 계산 (S-A-R 패턴에서 Action은 1, 4, 7, 10... 위치)
+                    if seq_pos % 3 == 1:  # Action 위치인 경우
+                        next_action_pos = seq_pos + 3  # 다음 Action 위치
+                        if next_action_pos < max_seq_len:
+                            # 다음 Action의 게이트 ID를 타겟으로 (더미 구현)
+                            target_actions[i][seq_pos] = (seq_pos // 3) % 20  # 임시 게이트 ID
+                        else:
+                            # 시퀀스 끝이면 EOS 토큰 (19번)
+                            target_actions[i][seq_pos] = 19
+                
+                debug_print(f"Debug: Fallback - set targets for batch {i}")
         
         return target_actions
 
@@ -153,7 +183,7 @@ class DecisionTransformerTrainer:
         model: DecisionTransformer,
         train_loader: DataLoader,
         val_loader: DataLoader,
-        save_dir: str = "./checkpoints"
+        save_dir: str = "OAT_Model/checkpoints"
     ):
         self.config = config
         self.model = model.to(config.device)
@@ -162,10 +192,10 @@ class DecisionTransformerTrainer:
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
         
-        # 문제 1 해결: 학습률 복원 (100배 감소 → 10배 감소)
+        # 문제 1 해결: 학습률 복원 
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=config.learning_rate * 0.1,  # 10배 감소로 완화
+            lr=config.learning_rate,
             weight_decay=config.weight_decay,
             eps=1e-8,  # 수치 안정성
             betas=(0.9, 0.95)  # 안정적인 모멘텀
@@ -223,7 +253,7 @@ class DecisionTransformerTrainer:
             squeezed_action_mask = batch['action_prediction_mask'].squeeze(1)
             squeezed_target_actions = batch['target_actions'].squeeze(1)
             loss_outputs = self.loss_fn(
-                action_logits=outputs['action_logits'],
+                action_logits=outputs['action_logits'],  # 손실 함수에서 마스킹 처리
                 target_actions=squeezed_target_actions,
                 action_prediction_mask=squeezed_action_mask
             )
@@ -297,10 +327,21 @@ class DecisionTransformerTrainer:
                     action_prediction_mask=batch['action_prediction_mask']
                 )
                 
+                # 🚨 CRITICAL FIX: 검증 단계에서도 마스크 차원 수정 필요
+                # action_prediction_mask와 target_actions를 squeeze해서 [batch, seq_len] 형태로 만들기
+                squeezed_action_mask = batch['action_prediction_mask']
+                squeezed_target_actions = batch['target_actions']
+                
+                # 차원 수정
+                if len(squeezed_action_mask.shape) == 3 and squeezed_action_mask.shape[1] == 1:
+                    squeezed_action_mask = squeezed_action_mask.squeeze(1)  # [batch, 1, seq_len] -> [batch, seq_len]
+                if len(squeezed_target_actions.shape) == 3 and squeezed_target_actions.shape[1] == 1:
+                    squeezed_target_actions = squeezed_target_actions.squeeze(1)  # [batch, 1, seq_len] -> [batch, seq_len]
+                
                 loss_outputs = self.loss_fn(
-                    action_logits=outputs['action_logits'],
-                    target_actions=batch['target_actions'],
-                    action_prediction_mask=batch['action_prediction_mask']
+                    action_logits=outputs['action_logits'],  # [batch, seq_len, n_gate_types]
+                    target_actions=squeezed_target_actions,  # [batch, seq_len]
+                    action_prediction_mask=squeezed_action_mask  # [batch, seq_len]
                 )
                 
                 total_loss += loss_outputs['loss'].item()
@@ -445,13 +486,15 @@ if __name__ == "__main__":
     train_loader.collate_fn = collator
     val_loader.collate_fn = collator
     
-    # 모델
-    model = create_decision_transformer(
+    # 🎆 NEW: 모듈러 어텐션을 지원하는 모델 생성 (gate 수는 싱글톤에서 자동 설정)
+    model = DecisionTransformer(
         d_model=config.d_model,
         n_layers=config.n_layers,
         n_heads=config.n_heads,
-        n_gate_types=config.n_gate_types
-    )
+        n_gate_types=config.n_gate_types,  # 이미 __post_init__에서 설정됨
+        dropout=config.dropout,
+        attention_mode=config.attention_mode
+    )  
     
     # 트레이너
     trainer = DecisionTransformerTrainer(

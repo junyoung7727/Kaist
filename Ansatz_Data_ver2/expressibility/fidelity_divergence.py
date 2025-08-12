@@ -324,7 +324,14 @@ class Divergence_Expressibility:
                 "total_samples": 0,
                 "error": f"Hardware execution failed: {str(e)}"
             }
-        
+    @staticmethod
+    def calculate_from_circuit_specs_divergence_list(circuit_specs: List[CircuitSpec], 
+                                    num_samples: int = 50) -> Dict[str, float]:
+        results = []
+        for circuit_spec in circuit_specs:
+            results.append(Divergence_Expressibility.calculate_from_circuit_specs_divergence_simulator(circuit_spec, num_samples))
+        return results
+    
     @staticmethod
     def calculate_from_circuit_specs_divergence_simulator(circuit_spec: CircuitSpec, 
                                     num_samples: int = 50) -> Dict[str, float]:

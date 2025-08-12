@@ -37,8 +37,8 @@ class ExperimentConfig:
 class Exp_Box:
     # IBM Quantum 1회 제출량 1천만 샷 제한 내 최적화된 실험 설계
     scalability_test = ExperimentConfig(
-        num_qubits=[3, 5, 7, 10, 20, 30, 40, 50],  # 12개 큐빗 수준
-        depth=[1, 2, 3, 5],  # 2개 깊이 (너무 많으면 샷 수 폭증)
+        num_qubits=[15, 20, 25, 30, 40, 50],  # 12개 큐빗 수준
+        depth=[1, 2, 3],  # 2개 깊이 (너무 많으면 샷 수 폭증)
         shots=512,     # 표현력 측정용 (감소)
         num_circuits=1,  # 회로 수 최소화
         optimization_level=3,
@@ -51,7 +51,7 @@ class Exp_Box:
     )
 
     simulator_data_set = ExperimentConfig(
-        num_qubits=[3, 4,5,6,7,8,9,10,11,12,13,14,15,16,17],  # 12개 큐빗 수준
+        num_qubits=[3, 4,5,6,7,8,9,10,11,12,13],  # 12개 큐빗 수준,14,15
         depth=[1, 2, 3, 4,5,6,7,8,9,10],  # 2개 깊이 (너무 많으면 샷 수 폭증)
         shots=1024,     # 표현력 측정용 (감소)
         num_circuits=10,  # 회로 수 최소화
@@ -71,7 +71,7 @@ class Exp_Box:
         shots=1024,
         num_circuits=1,
         optimization_level=1,
-        two_qubit_ratio=[0.1,0.3],
+        two_qubit_ratio=[0.1],
         exp_name="exp1",
         fidelity_shots=1024,
         executor = None,

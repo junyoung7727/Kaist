@@ -94,9 +94,9 @@ class StatevectorFidelityCalculator:
                 )
                 fidelities.append(fidelity)
                 #print(f"Fidelity between sample {i} and {j}: {fidelity}")
-        if fidelities.count(1.0) > 1:
-            print(circuit_spec.circuit_id)
-            QiskitQuantumCircuit(circuit_spec).build().qiskit_circuit.draw('mpl')
-            plt.show()
+        # if fidelities.count(1.0) > 1:
+            # print(circuit_spec.circuit_id)
+            # QiskitQuantumCircuit(circuit_spec).build().qiskit_circuit.draw('mpl')
+            # plt.show()
 
         return fidelities

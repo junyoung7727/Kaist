@@ -7,6 +7,8 @@ import torch
 import numpy as np
 from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass
+import sys
+from pathlib import Path
 
 # 임포트 경로 문제 해결
 try:
@@ -28,19 +30,25 @@ except ImportError:
         from data.quantum_circuit_dataset import CircuitSpec
         from encoding.grid_graph_encoder import GridGraphEncoder
         from encoding.Decision_Transformer_Embed import QuantumGateSequenceEmbedding
-import sys
-import pathlib
-sys.path.append(str(pathlib.Path(__file__).parent.parent.parent.parent / "quantumcommon"))
-from gates import gate_registry, QuantumGateRegistry
+
+# 🎆 NEW: 게이트 레지스트리 싱글톤 임포트
+sys.path.append(str(Path(__file__).parent.parent.parent.parent / "quantumcommon"))
+from gates import QuantumGateRegistry
 
 @dataclass
 class EmbeddingConfig:
     """임베딩 설정"""
     d_model: int = 512
-    n_gate_types: int = 20
+    n_gate_types: int = None  # NEW: gate vocab 싱글톤에서 자동 설정
     n_qubits: int = 10
     max_seq_len: int = 1000
     max_time_steps: int = 50
+
+    def __post_init__(self):
+        """초기화 후 gate 수를 싱글톤에서 가져오기"""
+        if self.n_gate_types is None:
+            self.n_gate_types = QuantumGateRegistry.get_singleton_gate_count()
+            print(f" EmbeddingConfig: Using gate vocab singleton, n_gate_types = {self.n_gate_types}")
 
 
 class EmbeddingPipeline:
@@ -48,6 +56,19 @@ class EmbeddingPipeline:
     
     def __init__(self, config: EmbeddingConfig):
         self.config = config
+        
+        # 게이트 레지스트리 싱글톤 초기화
+        self.gate_registry = QuantumGateRegistry()
+        
+        # 게이트 vocab 초기화
+        self.gate_vocab = self.gate_registry.get_gate_vocab()
+        
+        # 게이트 수 확인 및 설정 동기화
+        actual_gate_count = len(self.gate_vocab)
+        if self.config.n_gate_types != actual_gate_count:
+            print(f" Config mismatch: expected {self.config.n_gate_types}, got {actual_gate_count}")
+            self.config.n_gate_types = actual_gate_count
+        print(f" EmbeddingPipeline initialized with {actual_gate_count} gate types from singleton")
         
         # Grid Encoder 초기화
         self.grid_encoder = GridGraphEncoder()
@@ -181,7 +202,7 @@ if __name__ == "__main__":
     circuit_specs = manager.parse_circuits()
     
     # 임베딩 파이프라인 생성
-    config = EmbeddingConfig(d_model=256, n_gate_types=16)
+    config = EmbeddingConfig(d_model=256)  # NEW: 싱글톤에서 가져온 gate 수로 임베딩 레이어 초기화
     pipeline = create_embedding_pipeline(config)
     
     # 단일 회로 테스트

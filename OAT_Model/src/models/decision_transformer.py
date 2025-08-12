@@ -6,94 +6,35 @@ Decision Transformer Model
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 import math
 import os
+import sys
+from pathlib import Path
 
-# 디버그 모드 설정 (환경변수로 제어)
-DEBUG_MODE = os.getenv('DT_DEBUG', 'False').lower() == 'true'
+# 공통 디버그 유틸리티 사용
+from utils.debug_utils import debug_print, debug_tensor_info
 
-def debug_print(*args, **kwargs):
-    """디버그 모드일 때만 출력"""
-    if DEBUG_MODE:
-        print(*args, **kwargs)
+# 모듈러 어텐션 시스템 임포트
+from models.modular_attention import ModularAttention, AttentionMode, create_modular_attention
 
+# 🎆 NEW: 게이트 레지스트리 싱글톤 임포트
+sys.path.append(str(Path(__file__).parent.parent.parent.parent / "quantumcommon"))
+from gates import QuantumGateRegistry
 
-class MultiHeadAttention(nn.Module):
-    """멀티헤드 어텐션 (최적화된 안정성)"""
-    
-    def __init__(self, d_model: int, n_heads: int, dropout: float = 0.1):
-        super().__init__()
-        assert d_model % n_heads == 0
-        
-        self.d_model = d_model
-        self.n_heads = n_heads
-        self.d_k = d_model // n_heads
-        
-        self.w_q = nn.Linear(d_model, d_model)
-        self.w_k = nn.Linear(d_model, d_model)
-        self.w_v = nn.Linear(d_model, d_model)
-        self.w_o = nn.Linear(d_model, d_model)
-        
-        # 어텐션 가중치용 경량 dropout (문제 2 해결)
-        self.attn_dropout = nn.Dropout(dropout * 0.5)  # 절반로 감소
-        self.output_dropout = nn.Dropout(dropout)
-        
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        batch_size, seq_len, d_model = x.shape
-        debug_print(f"      Attention input - NaN: {torch.isnan(x).any()}, min/max: {x.min().item():.4f}/{x.max().item():.4f}")
-        
-        # Q, K, V 계산
-        Q = self.w_q(x)  # [batch, seq_len, d_model]
-        K = self.w_k(x)  # [batch, seq_len, d_model]
-        V = self.w_v(x)  # [batch, seq_len, d_model]
-        debug_print(f"      After QKV projection - Q NaN: {torch.isnan(Q).any()}, K NaN: {torch.isnan(K).any()}, V NaN: {torch.isnan(V).any()}")
-        
-        # 멀티헤드로 변형
-        Q = Q.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)  # [batch, n_heads, seq_len, d_k]
-        K = K.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)  # [batch, n_heads, seq_len, d_k]
-        V = V.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)  # [batch, n_heads, seq_len, d_k]
-        
-        # 어텐션 계산
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
-        debug_print(f"      After attention scores - NaN: {torch.isnan(scores).any()}")
-        
-        # 마스크 적용 (안정화된 마스킹)
-        if mask is not None:
-            # mask: [batch, seq_len, seq_len] -> [batch, 1, seq_len, seq_len]
-            # scores: [batch, n_heads, seq_len, seq_len]와 브로드캐스팅 가능하도록
-            mask = mask.unsqueeze(1)  # [batch, 1, seq_len, seq_len]
-            # 안정화된 마스킹 (너무 극단적이지 않은 값)
-            scores = scores.masked_fill(~mask, -1e9)
-            debug_print(f"      After mask application - NaN: {torch.isnan(scores).any()}")
-        
-        # 소프트맥스 및 어텐션 적용 (안정화된 소프트맥스)
-        # 수치 안정성을 위해 최대값 빼기
-        scores_max = scores.max(dim=-1, keepdim=True)[0]
-        scores_stable = scores - scores_max
-        attention_weights = F.softmax(scores_stable, dim=-1)
-        
-        # 문제 2 해결: 어텐션 dropout 복원 (경량화)
-        attention_weights = self.attn_dropout(attention_weights)
-        debug_print(f"      After softmax and light dropout - NaN: {torch.isnan(attention_weights).any()}")
-        
-        out = torch.matmul(attention_weights, V)
-        out = out.transpose(1, 2).contiguous().view(batch_size, seq_len, d_model)
-        
-        # 출력 프로젝션 및 dropout
-        out = self.w_o(out)
-        out = self.output_dropout(out)
-        
-        return out
+# 🗑️ REMOVED: Legacy MultiHeadAttention class - now using ModularAttention system
 
 
 class TransformerBlock(nn.Module):
-    """트랜스포머 블록 (최적화된 학습 안정성)"""
+    """트랜스포머 블록 (모듈러 어텐션 지원)"""
     
-    def __init__(self, d_model: int, n_heads: int, d_ff: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, n_heads: int, d_ff: int, dropout: float = 0.1, 
+                 attention_mode: str = "standard"):
         super().__init__()
         
-        self.attention = MultiHeadAttention(d_model, n_heads, dropout)
+        # 🎆 NEW: 모듈러 어텐션 사용
+        self.attention = create_modular_attention(d_model, n_heads, dropout, attention_mode)
+        self.attention_mode = attention_mode
         
         # 문제 6 해결: 피드포워드 정규화 최적화 (과도한 정규화 제거)
         self.feed_forward = nn.Sequential(
@@ -113,16 +54,17 @@ class TransformerBlock(nn.Module):
         # 문제 4 해결: 학습 가능한 스케일 파라미터 복원
         self.scale = nn.Parameter(torch.ones(1) * 0.5)  # 학습 가능한 파라미터
     
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        # 입력 체크
-        debug_print(f"    TransformerBlock input - NaN: {torch.isnan(x).any()}, min/max: {x.min().item():.4f}/{x.max().item():.4f}")
+    def forward(self, x: torch.Tensor, mask: torch.Tensor, 
+                grid_structure: Optional[Dict] = None, edges: Optional[List[Dict]] = None) -> torch.Tensor:
+        debug_print(f"  TransformerBlock input - NaN: {torch.isnan(x).any()}, min/max: {x.min().item():.4f}/{x.max().item():.4f}")
+        debug_print(f"  Using attention mode: {self.attention_mode}")
         
-        # Pre-norm + 어텐션 + 스케일링된 잔차 연결
+        # 🎆 NEW: 모듈러 어텐션 (고급 모드용 추가 인자 지원)
         norm_x = self.norm1(x)
         debug_print(f"    After norm1 - NaN: {torch.isnan(norm_x).any()}, min/max: {norm_x.min().item():.4f}/{norm_x.max().item():.4f}")
         
-        attn_out = self.attention(norm_x, mask)
-        debug_print(f"    After attention - NaN: {torch.isnan(attn_out).any()}, min/max: {attn_out.min().item():.4f}/{attn_out.max().item():.4f}")
+        attn_out = self.attention(norm_x, mask, grid_structure, edges)
+        debug_print(f"    After {self.attention_mode} attention - NaN: {torch.isnan(attn_out).any()}, min/max: {attn_out.min().item():.4f}/{attn_out.max().item():.4f}")
         
         dropout_attn = self.dropout1(attn_out)
         debug_print(f"    After dropout1 - NaN: {torch.isnan(dropout_attn).any()}, min/max: {dropout_attn.min().item():.4f}/{dropout_attn.max().item():.4f}")
@@ -150,6 +92,12 @@ class TransformerBlock(nn.Module):
         debug_print(f"    TransformerBlock output - NaN: {torch.isnan(x).any()}, min/max: {x.min().item():.4f}/{x.max().item():.4f}")
         
         return x
+    
+    def set_attention_mode(self, mode: str):
+        """어텐션 모드 변경"""
+        self.attention.set_mode(AttentionMode(mode.lower()))
+        self.attention_mode = mode
+        debug_print(f"TransformerBlock attention mode changed to: {mode}")
 
 
 class DecisionTransformer(nn.Module):
@@ -161,17 +109,27 @@ class DecisionTransformer(nn.Module):
         n_layers: int = 6,
         n_heads: int = 8,
         d_ff: int = 2048,
-        n_gate_types: int = 20,
-        dropout: float = 0.1
+        n_gate_types: int = None,  # 🎆 NEW: gate vocab 싱글톤에서 자동 설정
+        dropout: float = 0.1,
+        attention_mode: str = "standard"  # 🎆 NEW: 어텐션 모드 선택
     ):
         super().__init__()
         
         self.d_model = d_model
-        self.n_gate_types = n_gate_types
         
-        # 트랜스포머 레이어들
+        # 🎆 NEW: gate vocab 싱글톤에서 gate 수 가져오기
+        if n_gate_types is None:
+            self.n_gate_types = QuantumGateRegistry.get_singleton_gate_count()
+            debug_print(f"🎆 DecisionTransformer: Using gate vocab singleton, n_gate_types = {self.n_gate_types}")
+        else:
+            self.n_gate_types = n_gate_types
+            debug_print(f"⚠️ DecisionTransformer: Using manual n_gate_types = {self.n_gate_types}")
+        
+        self.attention_mode = attention_mode  # 🎆 NEW: 어텐션 모드 저장
+        
+        # 🎆 NEW: 모듈러 어텐션을 사용하는 트랜스포머 레이어들
         self.transformer_blocks = nn.ModuleList([
-            TransformerBlock(d_model, n_heads, d_ff, dropout)
+            TransformerBlock(d_model, n_heads, d_ff, dropout, attention_mode)
             for _ in range(n_layers)
         ])
         
@@ -216,7 +174,9 @@ class DecisionTransformer(nn.Module):
         self, 
         input_sequence: torch.Tensor,
         attention_mask: torch.Tensor,
-        action_prediction_mask: torch.Tensor
+        action_prediction_mask: torch.Tensor,
+        grid_structure: Optional[Dict] = None,  # 🎆 NEW: 고급 어텐션용
+        edges: Optional[List[Dict]] = None       # 🎆 NEW: 고급 어텐션용
     ) -> Dict[str, torch.Tensor]:
         """
         Args:
@@ -252,10 +212,10 @@ class DecisionTransformer(nn.Module):
         x = self.dropout(input_sequence)
         debug_print(f"Debug: After dropout - contains NaN: {torch.isnan(x).any()}")
         
-        # 트랜스포머 레이어들 통과
+        # 🎆 NEW: 모듈러 어텐션을 사용하는 트랜스포머 레이어들 통과
         for i, transformer_block in enumerate(self.transformer_blocks):
-            x = transformer_block(x, attention_mask)
-            debug_print(f"Debug: After transformer block {i} - contains NaN: {torch.isnan(x).any()}")
+            x = transformer_block(x, attention_mask, grid_structure, edges)
+            debug_print(f"Debug: After transformer block {i} ({self.attention_mode}) - contains NaN: {torch.isnan(x).any()}")
             if torch.isnan(x).any():
                 debug_print(f"Debug: NaN detected at transformer block {i}!")
                 break
@@ -274,6 +234,36 @@ class DecisionTransformer(nn.Module):
             'action_predictions': action_predictions,
             'hidden_states': x
         }
+    
+    def set_attention_mode(self, mode: str):
+        """모든 트랜스포머 블록의 어텐션 모드 변경"""
+        self.attention_mode = mode
+        for block in self.transformer_blocks:
+            block.set_attention_mode(mode)
+        debug_print(f"DecisionTransformer attention mode changed to: {mode}")
+    
+    def get_attention_mode(self) -> str:
+        """현재 어텐션 모드 반환"""
+        return self.attention_mode
+    
+    def compare_attention_modes(self, input_sequence: torch.Tensor, attention_mask: torch.Tensor, 
+                              action_prediction_mask: torch.Tensor) -> Dict[str, Dict[str, torch.Tensor]]:
+        """어텐션 모드별 결과 비교"""
+        original_mode = self.attention_mode
+        results = {}
+        
+        for mode in ["standard", "advanced", "hybrid"]:
+            self.set_attention_mode(mode)
+            with torch.no_grad():
+                output = self.forward(input_sequence, attention_mask, action_prediction_mask)
+                results[mode] = {
+                    'action_logits': output['action_logits'].clone(),
+                    'action_predictions': output['action_predictions'].clone()
+                }
+        
+        # 원래 모드로 복구
+        self.set_attention_mode(original_mode)
+        return results
     
     def predict_next_action(
         self,
@@ -385,7 +375,7 @@ if __name__ == "__main__":
         d_model=256,
         n_layers=4,
         n_heads=8,
-        n_gate_types=16
+        n_gate_types=20  # 🔧 FIXED: 통일된 게이트 타입 수
     )
     
     # 더미 데이터로 테스트
@@ -399,8 +389,8 @@ if __name__ == "__main__":
     # 순전파
     outputs = model(input_sequence, attention_mask, action_prediction_mask)
     
-    print(f"Action logits shape: {outputs['action_logits'].shape}")
-    print(f"Hidden states shape: {outputs['hidden_states'].shape}")
+    debug_print(f"Action logits shape: {outputs['action_logits'].shape}")
+    debug_print(f"Hidden states shape: {outputs['hidden_states'].shape}")
     
     # 손실 계산 테스트
     loss_fn = DecisionTransformerLoss()

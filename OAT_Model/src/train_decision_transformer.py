@@ -49,7 +49,7 @@ def main():
     # 학습 설정
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--num_epochs", type=int, default=100, help="Number of epochs")
+    parser.add_argument("--num_epochs", type=int, default=1, help="Number of epochs")
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay")
     
     # 기타 설정

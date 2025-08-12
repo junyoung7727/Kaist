@@ -12,6 +12,15 @@ from core.circuit_interface import CircuitSpec
 from core.qiskit_circuit import QiskitQuantumCircuit
 from qiskit_aer import AerSimulator
 
+def meyer_wallace_entropy_list(circuits: List[CircuitSpec]) -> List[float]:
+    results = []
+    for i,circuit in enumerate(circuits):
+        if i % 10 == 0:
+            print(i)
+            print(len(circuits))
+        results.append(meyer_wallace_entropy(circuit))
+    return results
+
 def meyer_wallace_entropy(circuit: CircuitSpec) -> float:
     """ Meyer-Wallace Entropy 계산
     
@@ -34,7 +43,7 @@ def meyer_wallace_entropy(circuit: CircuitSpec) -> float:
     
     for j in range(n):
         # 매 반복마다 원본 density matrix에서 시작하여 j번째 큐빗만 남김
-        reduced_rho_j = partial_trace(full_rho, [j])
+        reduced_rho_j = partial_trace(full_rho, [x for x in range(n) if x != j])
         purity_j = reduced_rho_j.purity().real  # 복소수의 실수 부분만 사용
         sum_purities += purity_j
 

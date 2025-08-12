@@ -261,88 +261,43 @@ def run_simulator_unified_batch_processing(exp_circuits: List, exp_config) -> tu
     
     errors = []
     
-    try:
-        # 실행자 생성
-        executor = QuantumExecutorFactory.create_executor("simulator")
-        exp_config.executor = executor
-        
-        # 배치 매니저 초기화
-        batch_manager = QuantumCircuitBatchManager(exp_config)
-        
-        # 1. 피델리티 태스크 수집
-        print("🎯 피델리티 태스크 수집...")
-        fidelity_indices = run_error_fidelity(exp_circuits, exp_config, batch_manager)
-        
-        # 2. 표현력 태스크 수집 (첫 번째 회로만)
-        print("📈 표현력 태스크 수집...")
-        expr_indices = Divergence_Expressibility.calculate_from_circuit_specs_divergence_hardware(
-            exp_circuits[0], exp_config, num_samples=5, batch_manager=batch_manager
-        )
-        
-        # 3. 얽힘도 태스크 수집
-        print("🔗 얽힘도 태스크 수집...")
-        entangle_indices = meyer_wallace_entropy_swap_test(exp_circuits, exp_config, batch_manager)
-        
-        # 4. 통합 배치 실행
-        print("🚀 통합 배치 실행 시작...")
-        task_results = batch_manager.execute_unified_batch()
-        
-        if not task_results:
-            raise Exception("배치 실행 실패")
-        
-        # 5. 결과 분배 및 조합
-        print("📊 결과 분배 및 조합...")
-        
-        # 피델리티 결과
-        fidelity_batch_results = batch_manager.get_task_results("fidelity", fidelity_indices)
-        fidelity_results = ResultDistributor.distribute_fidelity_results(
-            fidelity_batch_results, exp_circuits, exp_config
-        )
-        
-        # 표현력 결과
-        expr_batch_results = batch_manager.get_task_results("expressibility", expr_indices)
-        expr_results = ResultDistributor.distribute_expressibility_results(
-            expr_batch_results, {"circuit_spec": exp_circuits[0], "num_samples": 5}
-        )
-        
-        # 얽힘도 결과 - 배치 메타데이터에서 올바른 매핑 가져오기
-        entangle_batch_results = batch_manager.get_task_results("entanglement", entangle_indices)
-        
-        # 배치에서 저장된 circuit_mapping 메타데이터 가져오기
-        circuit_qubit_mapping = []
-        for idx in entangle_indices:
-            batch_info = batch_manager.get_circuit_info_by_index(idx)
-            if batch_info and "circuit_mapping" in batch_info.metadata:
-                # 메타데이터에서 전체 매핑을 가져와서 현재 인덱스에 해당하는 매핑 찾기
-                full_mapping = batch_info.metadata["circuit_mapping"]
-                # 첫 번째 결과의 매핑을 사용 (모든 얽힘도 회로가 같은 매핑을 가짐)
-                circuit_qubit_mapping = full_mapping
-                break
-        
-        if not circuit_qubit_mapping:
-            print("⚠️ 얽힘도 매핑을 찾을 수 없음, 기본 매핑 생성")
-            for circuit_idx, circuit in enumerate(exp_circuits):
-                for target_qubit in range(circuit.num_qubits):
-                    circuit_qubit_mapping.append((circuit_idx, target_qubit, circuit.num_qubits))
-        
-        print(f"🔍 얽힘도 매핑: {len(circuit_qubit_mapping)}개 항목, 결과: {len(entangle_batch_results)}개")
-        
-        entangle_results = ResultDistributor.distribute_entanglement_results(
-            entangle_batch_results, circuit_qubit_mapping
-        )
-        
-        # 최종 결과 조합
-        circuit_results = combine_all_results(exp_circuits, fidelity_results, expr_results, entangle_results)
-        
-        print(f"✅ 시뮬레이터 배치 처리 완료: {len(circuit_results)}개 회로 결과")
-        return circuit_results, errors
-        
-    except Exception as e:
-        error_msg = f"시뮬레이터 배치 처리 오류: {str(e)}"
-        print(f"❌ {error_msg}")
-        errors.append(error_msg)
-        return [], errors
+    # 실행자 생성
+    executor = QuantumExecutorFactory.create_executor("simulator")
+    exp_config.executor = executor
+    
+    # 1. 피델리티 태스크 수집
+    print("🎯 피델리티 태스크 수집...")
+    fidelity_results, robust_fidelity_results = run_error_fidelity(exp_circuits, exp_config)
+    
+    # 피델리티 결과를 딕셔너리 형태로 변환
+    combined_fidelity_results = []
+    for i in range(len(fidelity_results)):
+        combined_fidelity_results.append({
+            'standard': fidelity_results[i],
+            'robust': robust_fidelity_results[i]
+        })
+    
+    # 2. 표현력 태스크 수집
+    print("📈 표현력 태스크 수집...")
+    from expressibility.fidelity_divergence import Divergence_Expressibility
+    expr_results = Divergence_Expressibility.calculate_from_circuit_specs_divergence_list(
+        exp_circuits, num_samples=getattr(exp_config, 'num_samples', 50)
+    )
+    
+    # 3. 얽힘도 태스크 수집
+    print("🔗 얽힘도 태스크 수집...")
+    from core.entangle_simulator import meyer_wallace_entropy_list
+    entangle_results = meyer_wallace_entropy_list(exp_circuits)
+    
+    # 4. 결과 분배 및 조합
+    print("📊 결과 분배 및 조합...")
 
+    # 최종 결과 조합
+    circuit_results = combine_all_results(exp_circuits, combined_fidelity_results, expr_results, entangle_results)
+    
+    print(f"✅ 시뮬레이터 배치 처리 완료: {len(circuit_results)}개 회로 결과")
+    return circuit_results, errors
+    
 
 def combine_all_results(exp_circuits: List, fidelity_results: List, expr_results: List, entangle_results: List) -> List[Dict[str, Any]]:
     """
@@ -430,7 +385,7 @@ def main():
         print(f"   - 샷 수: {getattr(exp_config, 'shots', 1024)}")
         
         # 백엔드 선택
-        backend_type = "ibm"  # 테스트용, 실제로는 "ibm" 사용
+        backend_type = "simulator"  # 테스트용, 실제로는 "ibm" 사용
         
         print(f"\n🔌 백엔드: {backend_type.upper()}")
         

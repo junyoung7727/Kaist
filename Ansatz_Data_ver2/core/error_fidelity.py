@@ -64,6 +64,40 @@ class ErrorFidelityCalculator:
         # 피델리티 = P(|00...0⟩)
         fidelity = zero_counts / total_shots
         return float(fidelity)
+
+    @staticmethod
+    def cal_robust_fidelity(counts: Dict[str, int], num_qubits: int, shots: int) -> float:
+        """
+        Robust 피델리티 계산 - 큐빗 개수의 10%까지 1이어도 허용
+        
+        Args:
+            counts: 측정 결과 카운트
+            num_qubits: 큐빗 개수
+            shots: 총 샷 수
+            
+        Returns:
+            robust 피델리티 값
+        """
+        if shots == 0:
+            return 0.0
+            
+        # 허용 가능한 1의 개수 (10% 반올림)
+        max_ones = int(num_qubits * 0.1 + 0.5)
+        
+        # 허용 가능한 상태들의 총 카운트
+        valid_counts = 0
+        
+        for state, count in counts.items():
+            # 상태에서 1의 개수 계산
+            ones_count = state.count('1')
+            
+            # 허용 범위 내면 카운트에 추가
+            if ones_count <= max_ones:
+                valid_counts += count
+        
+        # Robust 피델리티 = 허용 상태 확률
+        robust_fidelity = valid_counts / shots
+        return float(robust_fidelity)
     
     @staticmethod
     def calculate_from_execution_result(result: 'ExecutionResult', num_qubits: int, shots: int) -> float:
@@ -77,10 +111,11 @@ class ErrorFidelityCalculator:
         Returns:
             피델리티 값 (0.0 ~ 1.0)
         """
-        if not result.success:
-            return 0.0
+
+        error_fidelity = ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits, shots)
+        robust_fidelity = ErrorFidelityCalculator.cal_robust_fidelity(result.counts, num_qubits, shots)
         
-        return ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits, shots)
+        return error_fidelity, robust_fidelity
 
 def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentConfig, batch_manager=None) -> Union[float, List[int]]:
     """
@@ -126,18 +161,20 @@ def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentC
         return indices
     else:
         executor = exp_config.executor
-        results = executor.execute_circuits(qiskit_circuits)
+        results = executor.execute_circuits(qiskit_circuits, exp_config)
         
         # 피델리티 계산
         fidelities = []
+        robust_fidelities = []
         for result, circuit_spec in zip(results, circuit_specs):
-            fidelity = ErrorFidelityCalculator.calculate_from_execution_result(
+            error_fidelity, robust_fidelity = ErrorFidelityCalculator.calculate_from_execution_result(
                 result, circuit_spec.num_qubits, exp_config.shots
             )
-            fidelities.append(fidelity)
+            fidelities.append(error_fidelity)
+            robust_fidelities.append(robust_fidelity)
         
-        # 평균 피델리티 반환 (기존 동작 유지)
-        return sum(fidelities) / len(fidelities) if fidelities else 0.0
+        # 평균 피델리티 반환
+        return fidelities, robust_fidelities
     
 def calculate_error_fidelity(counts: Dict[str, int], num_qubits: int, shots: int) -> float:
     """피델리티 계산 편의 함수"""

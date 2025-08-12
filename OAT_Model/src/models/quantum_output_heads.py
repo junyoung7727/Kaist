@@ -340,7 +340,7 @@ class QuantumOutputHeads(nn.Module):
 if __name__ == "__main__":
     # Test the output heads
     d_model = 512
-    n_gate_types = 10
+    n_gate_types = 20  # 🔧 FIXED: 통일된 게이트 타입 수
     n_qubits = 8
     batch_size = 4
     seq_len = 16
