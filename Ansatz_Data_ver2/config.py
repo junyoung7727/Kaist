@@ -50,6 +50,20 @@ class Exp_Box:
         num_samples=7          # 표현력 샘플 수 최소화 (2개면 1개 페어)
     )
 
+    scalability_test1 = ExperimentConfig(
+        num_qubits=[16,17,18,19,35,45],  # 12개 큐빗 수준
+        depth=[1, 2, 3],  # 2개 깊이 (너무 많으면 샷 수 폭증)
+        shots=512,     # 표현력 측정용 (감소)
+        num_circuits=1,  # 회로 수 최소화
+        optimization_level=3,
+        two_qubit_ratio=[0.3, 0.5, 0.8],  # 1개 비율만 (다양성 줄임)
+        exp_name="scalability_test1",
+        fidelity_shots=512,    # 피델리티 측정용
+        executor=None,
+        entangle_shots=512,    #얽힘도 측정용
+        num_samples=7          # 표현력 샘플 수 최소화 (2개면 1개 페어)
+    )
+
     simulator_data_set = ExperimentConfig(
         num_qubits=[3, 4,5,6,7,8,9,10,11,12,13],  # 12개 큐빗 수준,14,15
         depth=[1, 2, 3, 4,5,6,7,8,9,10],  # 2개 깊이 (너무 많으면 샷 수 폭증)
@@ -161,7 +175,7 @@ class Config:
         """설정 후처리"""
         # 환경변수에서 IBM 토큰 로드
         if not self.ibm_token:
-            self.ibm_token = os.getenv('IBM_TOKEN')
+            self.ibm_token = os.getenv('IBM_TOKEN_JUN')
         
         # 출력 디렉토리 생성
         os.makedirs(self.output_dir, exist_ok=True)

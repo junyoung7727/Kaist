@@ -355,75 +355,59 @@ class Divergence_Expressibility:
 
     @staticmethod
     def _cal_fidelity_divergence(fidelities: List[float], num_qubits: int):
-        try:
+
          # Haar 랜덤 피델리티 생성 (비교용)
-            num_pairs = len(fidelities)
-            haar_fidelities = Divergence_Expressibility.generate_haar_random_fidelities(num_qubits, num_pairs)
-            
-            # 히스토그램 계산을 위한 빈(bin) 정의 - 충분한 해상도 제공
-            num_bins = max(50, min(100, num_pairs * 10))  # 적응적 빈 수, 최소 50개
-            bins = np.linspace(0, 1, num_bins)
-            
-            # 히스토그램 계산
-            circuit_hist, _ = np.histogram(fidelities, bins=bins, density=True)
-            haar_hist, _ = np.histogram(haar_fidelities, bins=bins, density=True)
-            
-            # 히스토그램 정규화
-            circuit_hist = circuit_hist / np.sum(circuit_hist)
-            haar_hist = haar_hist / np.sum(haar_hist)
-            
-            # 0이 아닌 값만 고려하여 KL 다이버전스 계산
-            # 범위 제한 강화 - 너무 큰 값이나 작은 값 방지
-            circuit_hist = np.clip(circuit_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
-            haar_hist = np.clip(haar_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
-            #Divergence_Expressibility.plot_overlapping_histograms(circuit_hist, haar_hist)
-            
-            try:
-                # KL 다이버전스 계산: KL(circuit || haar) & KL(haar || circuit)
-                kl_div_circuit_haar = float(entropy(circuit_hist, haar_hist))
-                # 값 제한 - 수치 안정성 보장
-                kl_div_circuit_haar = min(kl_div_circuit_haar, 1e6)  # 너무 큰 값 방지
-                
-                kl_div_haar_circuit = float(entropy(haar_hist, circuit_hist))
-                kl_div_haar_circuit = min(kl_div_haar_circuit, 1e6)  # 너무 큰 값 방지
-                
-                # JS 다이버전스 계산
-                m_dist = 0.5 * (circuit_hist + haar_hist)
-                js_div = float(0.5 * entropy(circuit_hist, m_dist) + 0.5 * entropy(haar_hist, m_dist))
-                js_div = min(js_div, 1e6)  # 너무 큰 값 방지
-                
-                # L2 노름 계산
-                l2_dist = float(euclidean(circuit_hist, haar_hist) / np.sqrt(len(circuit_hist)))
-                l2_dist = min(l2_dist, 1e6)  # 너무 큰 값 방지
-                
-                # 표현력 지표 (1 / (1 + KL)) - 값이 1에 가까울수록 Haar와 유사
-                expressibility = float(1.0 / (1.0 + kl_div_circuit_haar))
-            except Exception as e:
-                print(f"다이버전스 계산 중 오류: {e}")
-                kl_div_circuit_haar = 1e6
-                kl_div_haar_circuit = 1e6
-                js_div = 1e6
-                l2_dist = 1e6
-                expressibility = 0.0  # 오류 발생 시 최악의 표현력으로 설정
-            
-            return {
-                "expressibility": expressibility,
-                "kl_divergence": kl_div_circuit_haar,
-                "kl_divergence_reverse": kl_div_haar_circuit,
-                "js_divergence": js_div,
-                "l2_norm": l2_dist,
-                "valid_samples": len(fidelities),
-            }
-        except Exception as e:
-            return {
-                "expressibility": float('nan'),
-                "kl_divergence": float('nan'),
-                "js_divergence": float('nan'),
-                "l2_norm": float('nan'),
-                "valid_samples": 0,
-                "error": str(e)
-            }
+        num_pairs = len(fidelities)
+        haar_fidelities = Divergence_Expressibility.generate_haar_random_fidelities(num_qubits, num_pairs)
         
+        # 히스토그램 계산을 위한 빈(bin) 정의 - 충분한 해상도 제공
+        num_bins = max(50, min(100, num_pairs * 10))  # 적응적 빈 수, 최소 50개
+        bins = np.linspace(0, 1, num_bins)
+        
+        # 히스토그램 계산
+        circuit_hist, _ = np.histogram(fidelities, bins=bins, density=True)
+        haar_hist, _ = np.histogram(haar_fidelities, bins=bins, density=True)
+        
+        # 히스토그램 정규화
+        circuit_hist = circuit_hist / np.sum(circuit_hist)
+        haar_hist = haar_hist / np.sum(haar_hist)
+        
+        # 0이 아닌 값만 고려하여 KL 다이버전스 계산
+        # 범위 제한 강화 - 너무 큰 값이나 작은 값 방지
+        circuit_hist = np.clip(circuit_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
+        haar_hist = np.clip(haar_hist, 1e-10, 1e10)  # 0과 극단적 큰 값 방지
+        #Divergence_Expressibility.plot_overlapping_histograms(circuit_hist, haar_hist)
+        
+        # KL 다이버전스 계산: KL(circuit || haar) & KL(haar || circuit)
+        kl_div_circuit_haar = float(entropy(circuit_hist, haar_hist))
+        # 값 제한 - 수치 안정성 보장
+        kl_div_circuit_haar = min(kl_div_circuit_haar, 1e6)  # 너무 큰 값 방지
+        
+        kl_div_haar_circuit = float(entropy(haar_hist, circuit_hist))
+        kl_div_haar_circuit = min(kl_div_haar_circuit, 1e6)  # 너무 큰 값 방지
+        
+        # JS 다이버전스 계산
+        m_dist = 0.5 * (circuit_hist + haar_hist)
+        js_div = float(0.5 * entropy(circuit_hist, m_dist) + 0.5 * entropy(haar_hist, m_dist))
+        js_div = min(js_div, 1e6)  # 너무 큰 값 방지
+        
+        # L2 노름 계산
+        l2_dist = float(euclidean(circuit_hist, haar_hist) / np.sqrt(len(circuit_hist)))
+        l2_dist = min(l2_dist, 1e6)  # 너무 큰 값 방지
+        
+        # 표현력 지표 (1 / (1 + KL)) - 값이 1에 가까울수록 Haar와 유사
+        expressibility = float(1.0 / (1.0 + kl_div_circuit_haar))
+
+    
+        return {
+            "expressibility": expressibility,
+            "kl_divergence": kl_div_circuit_haar,
+            "kl_divergence_reverse": kl_div_haar_circuit,
+            "js_divergence": js_div,
+            "l2_norm": l2_dist,
+            "valid_samples": len(fidelities),
+        }
+
            
     
     @staticmethod

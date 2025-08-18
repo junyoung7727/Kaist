@@ -1,0 +1,109 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            dvdp38dipghpxm6q9kudt068n6nu84ec:
+                codePath: OAT_Model\src\train_decision_transformer.py
+                codePathLocal: OAT_Model\src\train_decision_transformer.py
+                cpu_count: 4
+                cpu_count_logical: 8
+                cudaVersion: "12.7"
+                disk:
+                    /:
+                        total: "510287409152"
+                        used: "297082937344"
+                email: junghae2017@gmail.com
+                executable: C:\Users\jungh\Documents\GitHub\Kaist\.venv\Scripts\python.exe
+                git:
+                    commit: 62b2d239e726a3e06e250b64a7721f407b29ef32
+                    remote: https://github.com/junyoung7727/Kaist.git
+                gpu: NVIDIA GeForce GTX 1650 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Turing
+                      cudaCores: 1024
+                      memoryTotal: "4294967296"
+                      name: NVIDIA GeForce GTX 1650 Ti
+                      uuid: GPU-885812de-d817-1615-5bb0-fa7d86af1785
+                host: love
+                memory:
+                    total: "16907800576"
+                os: Windows-11-10.0.26100-SP0
+                program: c:\Users\jungh\Documents\GitHub\Kaist\OAT_Model\src\train_decision_transformer.py
+                python: CPython 3.12.8
+                root: C:\Users\jungh\Documents\GitHub\Kaist
+                startedAt: "2025-08-16T12:56:25.766443Z"
+                writerId: dvdp38dipghpxm6q9kudt068n6nu84ec
+        m: []
+        python_version: 3.12.8
+        t:
+            "1":
+                - 1
+                - 5
+                - 53
+            "2":
+                - 1
+                - 5
+                - 53
+            "3":
+                - 16
+            "4": 3.12.8
+            "5": 0.21.0
+            "8":
+                - 3
+            "12": 0.21.0
+            "13": windows-amd64
+attention_mode:
+    value: standard
+batch_size:
+    value: 32
+d_model:
+    value: 512
+device:
+    value: cpu
+dropout:
+    value: 0.1
+enable_filtering:
+    value: true
+eval_every:
+    value: 500
+gradient_accumulation_steps:
+    value: 1
+gradient_checkpointing:
+    value: true
+learning_rate:
+    value: 0.0003
+memory_cleanup_interval:
+    value: 50
+n_gate_types:
+    value: 20
+n_heads:
+    value: 8
+n_layers:
+    value: 6
+num_epochs:
+    value: 20
+project_name:
+    value: quantum-decision-transformer
+run_name:
+    value: null
+save_dir:
+    value: ./checkpoints
+save_every:
+    value: 1000
+seed:
+    value: 42
+test_ratio:
+    value: 0.15
+train_ratio:
+    value: 0.7
+use_amp:
+    value: false
+use_wandb:
+    value: true
+val_ratio:
+    value: 0.15
+warmup_steps:
+    value: 1000
+weight_decay:
+    value: 0.01

@@ -113,9 +113,8 @@ class ErrorFidelityCalculator:
         """
 
         error_fidelity = ErrorFidelityCalculator.calculate_from_counts(result.counts, num_qubits, shots)
-        robust_fidelity = ErrorFidelityCalculator.cal_robust_fidelity(result.counts, num_qubits, shots)
-        
-        return error_fidelity, robust_fidelity
+
+        return error_fidelity
 
 def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentConfig, batch_manager=None) -> Union[float, List[int]]:
     """
@@ -130,23 +129,17 @@ def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentC
         배치 모드: 배치 인덱스 리스트
         기존 모드: 피델리티 값
     """
-    from typing import Union
-    
     # 역회로 생성
-    inverse_circuits = []
     qiskit_circuits = []
-    
     for circuit_spec in circuit_specs:
         # 역회로 스펙 생성
         inverse_circuit_spec = InverseCircuitGenerator.create_inverse_spec(circuit_spec)
-        inverse_circuits.append(inverse_circuit_spec)
         
         # Qiskit 회로로 변환
         qiskit_circuit = QiskitQuantumCircuit(inverse_circuit_spec)
         qiskit_circuit.build() 
         
         # 측정 추가
-        qiskit_circuit.add_measurements()
         qiskit_circuits.append(qiskit_circuit.qiskit_circuit)
     
     if batch_manager:
@@ -162,12 +155,13 @@ def run_error_fidelity(circuit_specs: List[CircuitSpec], exp_config: ExperimentC
     else:
         executor = exp_config.executor
         results = executor.execute_circuits(qiskit_circuits, exp_config)
-        
+        print(results)
         # 피델리티 계산
         fidelities = []
         robust_fidelities = []
         for result, circuit_spec in zip(results, circuit_specs):
-            error_fidelity, robust_fidelity = ErrorFidelityCalculator.calculate_from_execution_result(
+            robust_fidelity = ErrorFidelityCalculator.cal_robust_fidelity(result.counts, circuit_spec.num_qubits, exp_config.shots)
+            error_fidelity = ErrorFidelityCalculator.calculate_from_execution_result(
                 result, circuit_spec.num_qubits, exp_config.shots
             )
             fidelities.append(error_fidelity)

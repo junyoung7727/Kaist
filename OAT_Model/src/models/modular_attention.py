@@ -65,22 +65,84 @@ class StandardMultiHeadAttention(nn.Module):
         K = K.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
         V = V.view(batch_size, seq_len, self.n_heads, self.d_k).transpose(1, 2)
         
-        # 어텐션 계산
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+        # 메모리 효율적인 어텐션 계산
+        if seq_len > 512:  # 긴 시퀀스에 대해 청크 단위 처리
+            chunk_size = 256
+            out_chunks = []
+            
+            for i in range(0, seq_len, chunk_size):
+                end_i = min(i + chunk_size, seq_len)
+                Q_chunk = Q[:, :, i:end_i, :]  # [batch, heads, chunk, d_k]
+                
+                # 청크별 어텐션 계산
+                scores_chunk = torch.matmul(Q_chunk, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+                
+                # 마스크 적용
+                if mask is not None:
+                    mask_chunk = mask[:, :, i:end_i, :]
+                    mask_value = -65504.0 if scores_chunk.dtype == torch.float16 else -1e9
+                    scores_chunk = scores_chunk.masked_fill(~mask_chunk, mask_value)
+                
+                # 안정화된 소프트맥스
+                scores_max = scores_chunk.max(dim=-1, keepdim=True)[0]
+                scores_stable = scores_chunk - scores_max
+                attention_weights_chunk = F.softmax(scores_stable, dim=-1)
+                attention_weights_chunk = self.attn_dropout(attention_weights_chunk)
+                
+                # 출력 계산
+                out_chunk = torch.matmul(attention_weights_chunk, V)
+                out_chunks.append(out_chunk)
+                
+                # 메모리 정리
+                del scores_chunk, attention_weights_chunk, out_chunk
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            
+            out = torch.cat(out_chunks, dim=2)  # 청크들을 다시 합침
+        else:
+            # 일반적인 어텐션 계산 (짧은 시퀀스)
+            scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+            
+            # 마스크 적용 (안정화된 마스킹)
+            if mask is not None:
+                mask = mask.unsqueeze(1)  # [batch, 1, seq_len, seq_len]
+                # 마스크를 Boolean 타입으로 변환
+                mask = mask.bool()
+                # FP16 호환 마스크 값 사용 (-65504는 FP16 최소값)
+                mask_value = -65504.0 if scores.dtype == torch.float16 else -1e9
+                scores = scores.masked_fill(~mask, mask_value)
+            
+            # 안정화된 소프트맥스
+            scores_max = scores.max(dim=-1, keepdim=True)[0]
+            scores_stable = scores - scores_max
+            attention_weights = F.softmax(scores_stable, dim=-1)
+            attention_weights = self.attn_dropout(attention_weights)
+            
+            out = torch.matmul(attention_weights, V)
+
+        debug_print(f"      Before transpose - out shape: {out.shape}")
+        debug_print(f"      Expected final shape: [{batch_size}, {seq_len}, {d_model}]")
         
-        # 마스크 적용 (안정화된 마스킹)
-        if mask is not None:
-            mask = mask.unsqueeze(1)  # [batch, 1, seq_len, seq_len]
-            scores = scores.masked_fill(~mask, -1e9)
+        out = out.transpose(1, 2).contiguous()
+        debug_print(f"      After transpose - out shape: {out.shape}")
         
-        # 안정화된 소프트맥스
-        scores_max = scores.max(dim=-1, keepdim=True)[0]
-        scores_stable = scores - scores_max
-        attention_weights = F.softmax(scores_stable, dim=-1)
-        attention_weights = self.attn_dropout(attention_weights)
+        # 안전한 reshape with size validation
+        expected_size = batch_size * seq_len * d_model
+        actual_size = out.numel()
+        debug_print(f"      Expected size: {expected_size}, Actual size: {actual_size}")
         
-        out = torch.matmul(attention_weights, V)
-        out = out.transpose(1, 2).contiguous().view(batch_size, seq_len, d_model)
+        if actual_size != expected_size:
+            debug_print(f"      Size mismatch! Attempting to fix...")
+            # 실제 차원을 기반으로 올바른 reshape 수행
+            out = out.view(batch_size, seq_len, -1)
+            if out.size(-1) != d_model:
+                debug_print(f"      Final dimension mismatch: got {out.size(-1)}, expected {d_model}")
+                # 마지막 차원을 d_model로 맞추기 위한 projection
+                if not hasattr(self, '_emergency_proj'):
+                    self._emergency_proj = nn.Linear(out.size(-1), d_model).to(out.device)
+                out = self._emergency_proj(out)
+        else:
+            out = out.view(batch_size, seq_len, d_model)
         
         # 출력 프로젝션 및 dropout
         out = self.w_o(out)

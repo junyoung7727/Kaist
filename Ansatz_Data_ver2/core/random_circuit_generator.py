@@ -35,6 +35,7 @@ def generate_random_circuit(exp_config: ExperimentConfig) -> List[CircuitSpec]:
                     builder.set_qubits(num_qubits)  # 특정 큐빗 수 설정
                     circuit_id = f"{exp_config.exp_name or 'circuit'}_{num_qubits}q_d{depth}_r{two_qubit_ratio}_{i}"
                     builder.set_circuit_id(circuit_id)
+                    builder.set_depth(depth)
                 
                     # 레지스트리에서 게이트 타입별로 게이트 가져오기
                     single_gates = []

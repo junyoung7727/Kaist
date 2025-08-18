@@ -1,0 +1,17 @@
+{
+  "experiment_name": "property_advanced_small",
+  "timestamp": "20250817_152356",
+  "config": {
+    "model_type": "property",
+    "attention_mode": "advanced",
+    "model_size": "small",
+    "d_model": 256,
+    "n_heads": 4,
+    "n_layers": 3,
+    "d_ff": 512,
+    "dropout": 0.2,
+    "learning_rate": 0.01,
+    "batch_size": 64,
+    "num_epochs": 100
+  }
+}

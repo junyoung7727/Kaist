@@ -16,7 +16,6 @@ from execution.executor import AbstractQuantumExecutor, ExecutionResult, registe
 from config import default_config, ExperimentConfig
 from core.qiskit_circuit import QiskitQuantumCircuit
 from core.circuit_interface import AbstractQuantumCircuit, CircuitSpec
-from core.batch_size_calculator import calculate_dynamic_batch_sizes
 from qiskit_ibm_runtime import SamplerV2 as Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
@@ -110,12 +109,12 @@ class IBMExecutor(AbstractQuantumExecutor):
             
             # IBM Quantum에서 실행
             job = self._sampler.run([transpiled_circuit])
-            result = job.result()
+            run_result = job.result()
             
-            # 결과 처리 - 클래식 레지스터 수만큼만 자르기
-            raw_counts = result[0].data.meas.get_counts()
+            # 결과 처리 - SamplerV2: join_data().get_counts()
+            single_result = run_result[0] if isinstance(run_result, (list, tuple)) else run_result
+            raw_counts = single_result.join_data().get_counts()
             counts = self._truncate_counts_to_original_qubits(raw_counts, classical_bits)
-
             
             execution_time = time.time() - start_time
             
@@ -156,20 +155,15 @@ class IBMExecutor(AbstractQuantumExecutor):
             
         print(f"\n🚀 IBM Quantum 배치 실행 시작: {len(qiskit_circuits)}개 회로")
         
-        # 동적 배치 크기 계산 (회로별 메모리 사용량 기반)
-        batch_sizes = calculate_dynamic_batch_sizes(
-            circuits=qiskit_circuits,
-            shots_per_circuit=exp_config.shots,
-            backend_type="aer",
-            verbose=True
-        )
+        # 고정 배치 크기 계산 (샷/페이로드 제약 기반)
+        batch_size = self._calculate_max_batch_size(qiskit_circuits, exp_config)
         
-        if len(batch_sizes) == 1 and batch_sizes[0] >= len(qiskit_circuits):
+        if len(qiskit_circuits) <= batch_size:
             # 단일 배치로 처리 가능
             return self._execute_single_batch(qiskit_circuits, exp_config)
         else:
-            # 다중 배치로 분할 처리
-            return self._execute_multiple_batches(qiskit_circuits, exp_config, batch_sizes)
+            # 고정 배치 크기로 분할 처리
+            return self._execute_multiple_batches(qiskit_circuits, exp_config, batch_size)
     
     def _calculate_max_batch_size(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig) -> int:
         """
@@ -244,16 +238,16 @@ class IBMExecutor(AbstractQuantumExecutor):
         transpiled_circuits = self._transpile_circuits(qiskit_circuits)
         
         # IBM Quantum에서 실행
-        # job = self._sampler.run(transpiled_circuits)
-        # results = job.result()
+        job = self._sampler.run(transpiled_circuits)
+        results = job.result()
 
         #테스트용 코드
-        results = []
-        from qiskit_aer import AerSimulator
-        sim = AerSimulator()
-        result = sim.run(transpiled_circuits).result()
-        for i in range(len(transpiled_circuits)):
-            results.append(result.get_counts(i))
+        # results = []
+        # from qiskit_aer import AerSimulator
+        # sim = AerSimulator()
+        # result = sim.run(transpiled_circuits).result()
+        # for i in range(len(transpiled_circuits)):
+        #     results.append(result.get_counts(i))
         
         # 결과 처리
         execution_results = self._process_batch_results(results, qiskit_circuits, original_classical_bits, exp_config, start_time)
@@ -261,34 +255,29 @@ class IBMExecutor(AbstractQuantumExecutor):
         print(f"✅ 단일 배치 완료: {len(execution_results)}개 결과")
         return execution_results
     
-    def _execute_multiple_batches(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig, batch_sizes: List[int]) -> List[ExecutionResult]:
+    def _execute_multiple_batches(self, qiskit_circuits: List[QuantumCircuit], exp_config: ExperimentConfig, batch_size: int) -> List[ExecutionResult]:
         """
-        동적 배치 크기를 사용한 다중 배치 분할 실행
+        고정 배치 크기를 사용한 다중 배치 분할 실행
         
         Args:
             qiskit_circuits: 실행할 양자 회로 리스트
             exp_config: 실험 설정
-            batch_sizes: 각 배치의 크기를 담은 리스트
+            batch_size: 각 배치의 고정 크기
         """
         total_circuits = len(qiskit_circuits)
-        num_batches = len(batch_sizes)
+        num_batches = (total_circuits + batch_size - 1) // batch_size
         
-        print(f"🔄 동적 다중 배치 실행: {total_circuits}개 회로를 {num_batches}개 배치로 분할")
-        print(f"   배치 크기: {batch_sizes}")
+        print(f"🔄 고정 다중 배치 실행: 총 {total_circuits}개 회로, 배치 크기 {batch_size}, 배치 수 {num_batches}")
         
         all_results = []
-        circuit_idx = 0
         
-        for batch_idx, batch_size in enumerate(batch_sizes):
-            # 현재 배치의 회로들 선택
-            start_idx = circuit_idx
-            end_idx = min(circuit_idx + batch_size, total_circuits)
+        for batch_idx, start_idx in enumerate(range(0, total_circuits, batch_size)):
+            end_idx = min(start_idx + batch_size, total_circuits)
             batch_circuits = qiskit_circuits[start_idx:end_idx]
             actual_batch_size = len(batch_circuits)
             
             print(f"\n📦 배치 {batch_idx + 1}/{num_batches}: {actual_batch_size}개 회로 (인덱스 {start_idx}-{end_idx-1})")
             
-            # 배치 크기가 0이면 건너뛰기
             if actual_batch_size == 0:
                 print(f"⚠️  배치 {batch_idx + 1} 건너뛰기: 회로 없음")
                 continue
@@ -299,7 +288,6 @@ class IBMExecutor(AbstractQuantumExecutor):
                 print(f"✅ 배치 {batch_idx + 1} 완료: {len(batch_results)}개 결과")
             except Exception as e:
                 print(f"❌ 배치 {batch_idx + 1} 실패: {e}")
-                # 실패한 배치에 대해 빈 결과 추가
                 for i in range(actual_batch_size):
                     all_results.append(ExecutionResult(
                         counts={},
@@ -310,14 +298,8 @@ class IBMExecutor(AbstractQuantumExecutor):
                         success=False,
                         error_message=str(e)
                     ))
-            
-            circuit_idx = end_idx
-            
-            # 모든 회로를 처리했으면 종료
-            if circuit_idx >= total_circuits:
-                break
         
-        print(f"\n🎉 모든 동적 배치 완료: {len(all_results)}개 결과")
+        print(f"\n🎉 모든 고정 배치 완료: {len(all_results)}개 결과")
         return all_results
     
     def _transpile_circuits(self, qiskit_circuits: List[QuantumCircuit]) -> List[QuantumCircuit]:
@@ -347,8 +329,8 @@ class IBMExecutor(AbstractQuantumExecutor):
         
         # results는 단일 Result 객체, 각 회로의 결과는 인덱스로 접근
         for i, result in enumerate(results):
-            #raw_counts = result.data.meas.get_counts() #원래코드임, 지우지 말것것
-            raw_counts = result #테스트용 지우지 말것것
+            raw_counts = result.join_data().get_counts()
+            #aw_counts = result #테스트용
             # 각 회로의 원래 클래식 레지스터 수만큼만 자르기
             counts = self._truncate_counts_to_original_qubits(raw_counts, original_classical_bits[i])
             
@@ -362,7 +344,7 @@ class IBMExecutor(AbstractQuantumExecutor):
             ))
         return execution_results
 
-    def get_backend_info(self, exp_config) -> Dict[str, Any]:
+    def get_backend_info(self, exp_config=None) -> Dict[str, Any]:
         """백엔드 정보 반환"""
         if not self._backend:
             return {
@@ -374,6 +356,11 @@ class IBMExecutor(AbstractQuantumExecutor):
         try:
             status = self._backend.status()
             configuration = self._backend.configuration()
+            shots = None
+            try:
+                shots = (exp_config.shots if exp_config is not None else getattr(self, 'exp_config', None).shots)
+            except Exception:
+                shots = None
             
             return {
                 'backend_type': 'ibm',
@@ -383,14 +370,14 @@ class IBMExecutor(AbstractQuantumExecutor):
                 'num_qubits': configuration.num_qubits,
                 'coupling_map': configuration.coupling_map,
                 'basis_gates': configuration.basis_gates,
-                'shots': exp_config.shots
+                'shots': shots
             }
         except Exception as e:
             return {
                 'backend_type': 'ibm',
                 'backend_name': self._backend_name,
                 'status': f'error: {e}',
-                'shots': exp_config.shots
+                'shots': (exp_config.shots if exp_config is not None else getattr(self, 'exp_config', None).shots if hasattr(self, 'exp_config') else None)
             }
     
     async def cleanup(self):

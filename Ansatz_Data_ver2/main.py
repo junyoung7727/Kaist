@@ -324,7 +324,7 @@ def combine_all_results(exp_circuits: List, fidelity_results: List, expr_results
         result = {
             "circuit_id": getattr(circuit, 'circuit_id', f"circuit_{i}"),
             "num_qubits": circuit.num_qubits,
-            "depth": len(circuit.gates) if hasattr(circuit, 'gates') else 0,
+            "depth": circuit.depth,
             "timestamp": datetime.now().isoformat()
         }
         
@@ -376,7 +376,7 @@ def main():
     try:
         # 설정 로드
         exp_box = Exp_Box()
-        exp_config = exp_box.get_setting("simulator_data_set")
+        exp_config = exp_box.get_setting("exp1")
         
         print(f"\n📋 실험 설정:")
         print(f"   - 큐빗 수: {exp_config.num_qubits}")

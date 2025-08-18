@@ -22,12 +22,14 @@ class CircuitSpec:
     num_qubits: int
     gates: List[GateOperation]
     circuit_id: str
+    depth: int
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "num_qubits": self.num_qubits,
             "gates": [g.to_dict() for g in self.gates],
-            "circuit_id": self.circuit_id
+            "circuit_id": self.circuit_id,
+            "depth": self.depth
         }
     
     @classmethod
@@ -37,7 +39,8 @@ class CircuitSpec:
         return cls(
             num_qubits=data.get("num_qubits", 0),
             gates=gates,
-            circuit_id=data.get("circuit_id", "")
+            circuit_id=data.get("circuit_id", ""),
+            depth=data.get("depth", 0)
         )
 
 
@@ -137,6 +140,7 @@ class CircuitBuilder:
         self._gates: List[GateOperation] = []
         self._num_qubits = 0
         self._circuit_id = None
+        self._depth = 0
     
     def set_qubits(self, num_qubits: int) -> 'CircuitBuilder':
         """큐빗 수 설정"""
@@ -146,6 +150,11 @@ class CircuitBuilder:
     def set_circuit_id(self, circuit_id: str) -> 'CircuitBuilder':
         """회로 식별자 설정"""
         self._circuit_id = circuit_id
+        return self
+    
+    def set_depth(self, depth: int) -> 'CircuitBuilder':
+        """회로 깊이 설정"""
+        self._depth = depth
         return self
     
     def add_gate(self, name: str, qubits: Union[int, List[int]], 
@@ -169,7 +178,8 @@ class CircuitBuilder:
         return CircuitSpec(
             num_qubits=self._num_qubits,
             gates=self._gates.copy(),
-            circuit_id=self._circuit_id
+            circuit_id=self._circuit_id,
+            depth=self._depth
         )
     
     def clear(self) -> 'CircuitBuilder':
@@ -177,6 +187,7 @@ class CircuitBuilder:
         self._gates.clear()
         self._num_qubits = 0
         self._circuit_id = None
+        self._depth = 0
         return self
 
 

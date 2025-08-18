@@ -81,8 +81,6 @@ class QuantumCircuitGenerator:
                                                 dtype=torch.long, device=self.device)
         req_tensors['max_depth'] = torch.tensor([[requirements.get('max_depth', 50.0)]], 
                                                dtype=torch.float, device=self.device)
-        req_tensors['two_qubit_ratio'] = torch.tensor([[requirements.get('two_qubit_ratio', 0.3)]], 
-                                                     dtype=torch.float, device=self.device)
         
         return req_tensors
     

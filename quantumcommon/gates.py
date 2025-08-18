@@ -37,6 +37,7 @@ class GateType(Enum):
     PARAMETRIC = "parametric"
     TWO_QUBIT_PARAMETRIC = "two_qubit_parametric"
     THREE_QUBIT = "three_qubit"
+    SPECIAL = "special"  # EOS, PAD 등 특수 토큰용
 
 
 @dataclass
@@ -138,9 +139,17 @@ class QuantumGateRegistry:
                           description="Controlled rotation around Z-axis"),
         ]
         
+        # 특수 토큰 (EOS, PAD)
+        special_tokens = [
+            GateDefinition("[EOS]", GateType.SPECIAL, 0, 0, is_hermitian=True,
+                          description="End of sequence token"),
+            GateDefinition("[PAD]", GateType.SPECIAL, 0, 0, is_hermitian=True,
+                          description="Padding token"),
+        ]
+        
         # 모든 게이트 등록
         all_gates = (single_qubit_gates + parametric_single_gates + 
-                    two_qubit_gates + three_qubit_gates + parametric_two_gates)
+                    two_qubit_gates + three_qubit_gates + parametric_two_gates + special_tokens)
         
         for gate_def in all_gates:
             self._gates[gate_def.name] = gate_def
@@ -149,8 +158,6 @@ class QuantumGateRegistry:
         self.gate_vocab = {}
         for i, gate_def in enumerate(self._gates.keys()):
             self.gate_vocab[gate_def] = i
-        self.gate_vocab['[PAD]'] = len(self.gate_vocab)
-        self.gate_vocab['[EMPTY]'] = len(self.gate_vocab) + 1
         return self.gate_vocab
     
     def get_gate_count(self) -> int:
@@ -269,8 +276,3 @@ def validate_gate_operation(name: str, qubits: List[int], parameters: List[float
         return False
     
     return True
-
-a = QuantumGateRegistry()
-ga = a.get_gate_vocab()
-print(ga)
-print(len(ga))

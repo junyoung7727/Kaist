@@ -1,0 +1,17 @@
+{
+  "experiment_name": "property_standard_medium",
+  "timestamp": "20250817_101308",
+  "config": {
+    "model_type": "property",
+    "attention_mode": "standard",
+    "model_size": "medium",
+    "d_model": 512,
+    "n_heads": 8,
+    "n_layers": 6,
+    "d_ff": 1024,
+    "dropout": 0.15,
+    "learning_rate": 0.0001,
+    "batch_size": 16,
+    "num_epochs": 100
+  }
+}
